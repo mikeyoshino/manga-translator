@@ -41,8 +41,12 @@ share/python-wheels/
 *.egg
 MANIFEST
 .history
-/venv
+# Virtual Environments
+**/venv/
 .venv/
+venv/
+**/__pycache__/
+
 
 # Input and Output
 /input/
