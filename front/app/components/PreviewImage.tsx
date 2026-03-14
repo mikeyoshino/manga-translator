@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 
 const ImagePreview = React.memo(
-  ({ file, result }: { file: File; result: File | null }) => {
+  ({ file, result }: { file: File; result: Blob | File | null }) => {
     // Create URL only when file or result changes
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     useEffect(() => {
@@ -14,7 +14,7 @@ const ImagePreview = React.memo(
       <img
         src={imageUrl ?? undefined}
         alt={file.name}
-        className="w-full h-full object-contain rounded-lg border border-gray-200"
+        className="w-full max-h-[70vh] object-contain rounded-lg border border-gray-200"
       />
     );
   }

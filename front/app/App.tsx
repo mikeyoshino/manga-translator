@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router";
 import {
   type StatusKey,
   processingStatuses,
@@ -8,6 +9,8 @@ import {
   type QueuedImage,
   type TranslationSettings,
   type FinishedImage,
+  type TranslationResponseJson,
+  type EditorImage,
 } from "@/types";
 import { imageMimeTypes } from "@/config";
 import { OptionsPanel } from "@/components/OptionsPanel";
@@ -16,8 +19,14 @@ import { ImageQueue } from "@/components/ImageQueue";
 import { ResultGallery } from "@/components/ResultGallery";
 import { Header } from "@/components/Header";
 import { loadSettings, saveSettings, loadFinishedImages, addFinishedImage } from "@/utils/localStorage";
+import { translateWithJsonStream } from "@/utils/translateJson";
+import { initEditableBlocks } from "@/utils/initEditableBlocks";
+import { useEditor } from "@/context/EditorContext";
 
 export const App: React.FC = () => {
+  const navigate = useNavigate();
+  const { setImages: setEditorImages } = useEditor();
+
   // State Hooks
   const [fileStatuses, setFileStatuses] = useState<Map<string, FileStatus>>(
     new Map()
@@ -30,18 +39,23 @@ export const App: React.FC = () => {
   const [finishedImages, setFinishedImages] = useState<FinishedImage[]>([]);
   const [currentProcessingImage, setCurrentProcessingImage] = useState<QueuedImage | null>(null);
 
-  // Translation Options State Hooks
-  const [detectionResolution, setDetectionResolution] = useState("1536");
-  const [textDetector, setTextDetector] = useState("default");
-  const [renderTextDirection, setRenderTextDirection] = useState("auto");
-  const [translator, setTranslator] = useState<TranslatorKey>("youdao");
-  const [targetLanguage, setTargetLanguage] = useState("CHS");
+  // Editor data collected during JSON translation
+  const [editorImagesData, setEditorImagesData] = useState<EditorImage[]>([]);
 
-  const [inpaintingSize, setInpaintingSize] = useState("2048");
-  const [customUnclipRatio, setCustomUnclipRatio] = useState<number>(2.3);
-  const [customBoxThreshold, setCustomBoxThreshold] = useState<number>(0.7);
-  const [maskDilationOffset, setMaskDilationOffset] = useState<number>(30);
-  const [inpainter, setInpainter] = useState("default");
+  // Translation Options State Hooks
+  // Initialize settings from localStorage to survive navigation
+  const [savedSettings] = useState(() => loadSettings());
+  const [detectionResolution, setDetectionResolution] = useState(savedSettings.detectionResolution || "1536");
+  const [textDetector, setTextDetector] = useState(savedSettings.textDetector || "default");
+  const [renderTextDirection, setRenderTextDirection] = useState(savedSettings.renderTextDirection || "auto");
+  const [translator, setTranslator] = useState<TranslatorKey>(savedSettings.translator || "youdao");
+  const [targetLanguage, setTargetLanguage] = useState(savedSettings.targetLanguage || "THA");
+
+  const [inpaintingSize, setInpaintingSize] = useState(savedSettings.inpaintingSize || "2048");
+  const [customUnclipRatio, setCustomUnclipRatio] = useState<number>(savedSettings.customUnclipRatio ?? 2.3);
+  const [customBoxThreshold, setCustomBoxThreshold] = useState<number>(savedSettings.customBoxThreshold ?? 0.7);
+  const [maskDilationOffset, setMaskDilationOffset] = useState<number>(savedSettings.maskDilationOffset ?? 30);
+  const [inpainter, setInpainter] = useState(savedSettings.inpainter || "default");
 
   // Computed State (useMemo)
   const isProcessing = useMemo(() => {
@@ -67,23 +81,7 @@ export const App: React.FC = () => {
   }, [files, fileStatuses]);
 
   // Effects
-  /** Load saved settings and finished images from localStorage */
-  useEffect(() => {
-    const savedSettings = loadSettings();
-    if (savedSettings.detectionResolution) setDetectionResolution(savedSettings.detectionResolution);
-    if (savedSettings.textDetector) setTextDetector(savedSettings.textDetector);
-    if (savedSettings.renderTextDirection) setRenderTextDirection(savedSettings.renderTextDirection);
-    if (savedSettings.translator) setTranslator(savedSettings.translator);
-    if (savedSettings.targetLanguage) setTargetLanguage(savedSettings.targetLanguage);
-    if (savedSettings.inpaintingSize) setInpaintingSize(savedSettings.inpaintingSize);
-    if (savedSettings.customUnclipRatio) setCustomUnclipRatio(savedSettings.customUnclipRatio);
-    if (savedSettings.customBoxThreshold) setCustomBoxThreshold(savedSettings.customBoxThreshold);
-    if (savedSettings.maskDilationOffset) setMaskDilationOffset(savedSettings.maskDilationOffset);
-    if (savedSettings.inpainter) setInpainter(savedSettings.inpainter);
-
-    const savedFinishedImages = loadFinishedImages();
-    setFinishedImages(savedFinishedImages);
-  }, []);
+  // Settings are loaded via useState initializers above (no useEffect needed)
 
   /** Save settings to localStorage whenever they change */
   useEffect(() => {
@@ -196,6 +194,13 @@ export const App: React.FC = () => {
     localStorage.removeItem('manga-translator-finished-images');
   };
 
+  const openEditor = () => {
+    if (editorImagesData.length > 0) {
+      setEditorImages(editorImagesData);
+      navigate("/editor");
+    }
+  };
+
   /**
    * フォーム送信 (翻訳リクエスト)
    */
@@ -236,7 +241,7 @@ export const App: React.FC = () => {
     formData.append("image", file);
     formData.append("config", config);
 
-    const response = await fetch(`/api/translate/with-form/image/stream`, {
+    const response = await fetch(`/api/translate/with-form/json/stream`, {
       method: "POST",
       body: formData,
     });
@@ -269,7 +274,7 @@ export const App: React.FC = () => {
 
     // Process all complete messages in buffer
     while (processedBuffer.length >= 5) {
-      const dataSize = new DataView(processedBuffer.buffer).getUint32(1, false);
+      const dataSize = new DataView(processedBuffer.buffer, processedBuffer.byteOffset, processedBuffer.byteLength).getUint32(1, false);
       const totalSize = 5 + dataSize;
       if (processedBuffer.length < totalSize) break;
 
@@ -375,13 +380,53 @@ export const App: React.FC = () => {
     data: Uint8Array
   ): void => {
     switch (statusCode) {
-      case 0: // 結果が返ってきた
-        const resultBlob = new Blob([data], { type: "image/png" });
-        updateFileStatus(fileId, {
-          status: "finished",
-          result: resultBlob,
-        });
-        
+      case 0: { // 結果が返ってきた — now JSON response
+        const decodedJson = new TextDecoder("utf-8").decode(data);
+        let parsed: TranslationResponseJson;
+        try {
+          parsed = JSON.parse(decodedJson);
+          console.log("[case 0] Parsed JSON successfully, translations:", parsed.translations?.length, "has inpainted_image:", !!parsed.inpainted_image);
+        } catch (e) {
+          console.error("[case 0] JSON parse failed, falling back to blob. Error:", e, "data length:", data.length, "first 100 chars:", decodedJson.substring(0, 100));
+          // Fallback: treat as image blob if JSON parse fails
+          const resultBlob = new Blob([data], { type: "image/png" });
+          updateFileStatus(fileId, { status: "finished", result: resultBlob });
+          break;
+        }
+
+        // Create preview blob from rendered image (with translated text burned in)
+        // Fall back to inpainted_image, then original file
+        let resultBlob: Blob;
+        const previewB64 = parsed.rendered_image || parsed.inpainted_image;
+        if (previewB64) {
+          const b64 = previewB64.split(",")[1];
+          console.log("[case 0] preview image b64 length:", b64?.length, "source:", parsed.rendered_image ? "rendered" : "inpainted");
+          const binary = atob(b64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          resultBlob = new Blob([bytes], { type: "image/png" });
+          console.log("[case 0] Created blob, size:", resultBlob.size, "type:", resultBlob.type);
+        } else {
+          console.warn("[case 0] No rendered/inpainted image in response, using original file");
+          const matchingOriginal = files.find((f) => f.name === fileId);
+          resultBlob = matchingOriginal ?? new Blob([], { type: "image/png" });
+        }
+
+        updateFileStatus(fileId, { status: "finished", result: resultBlob });
+
+        // Collect editor data
+        const matchingFile = files.find((f) => f.name === fileId);
+        if (matchingFile) {
+          const editorImage: EditorImage = {
+            id: `${fileId}-${Date.now()}`,
+            originalFile: matchingFile,
+            translationResponse: parsed,
+            editableBlocks: initEditableBlocks(parsed.translations, targetLanguage),
+            isDirty: false,
+          };
+          setEditorImagesData((prev) => [...prev, editorImage]);
+        }
+
         // Add to finished images gallery
         const settings: TranslationSettings = {
           detectionResolution,
@@ -395,7 +440,7 @@ export const App: React.FC = () => {
           maskDilationOffset,
           inpainter,
         };
-        
+
         const finishedImage: FinishedImage = {
           id: `${fileId}-${Date.now()}`,
           originalName: fileId,
@@ -403,10 +448,11 @@ export const App: React.FC = () => {
           finishedAt: new Date(),
           settings,
         };
-        
-        setFinishedImages(prev => [finishedImage, ...prev]);
+
+        setFinishedImages((prev) => [finishedImage, ...prev]);
         addFinishedImage(finishedImage);
         break;
+      }
       case 1: // 翻訳中
         const newStatus = decodedData as StatusKey;
         updateFileStatus(fileId, { status: newStatus });
@@ -487,6 +533,18 @@ export const App: React.FC = () => {
               removeFile={removeFile}
             />
           </div>
+
+          {/* Open in Editor */}
+          {editorImagesData.length > 0 && (
+            <div className="border-t pt-6 flex justify-center">
+              <button
+                onClick={openEditor}
+                className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors font-medium shadow-md"
+              >
+                Open in Editor ({editorImagesData.length} image{editorImagesData.length > 1 ? "s" : ""})
+              </button>
+            </div>
+          )}
 
           {/* Results Gallery */}
           <div className="border-t pt-6">

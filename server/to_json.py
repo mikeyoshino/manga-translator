@@ -48,6 +48,15 @@ class Translation(BaseModel):
         description="Background image encoded as a base64 string",
         examples=["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA..."]
     )
+    font_size: float = -1
+    direction: str = "auto"
+    alignment: str = "auto"
+    line_spacing: float = 1.0
+    letter_spacing: float = 1.0
+    bold: bool = False
+    italic: bool = False
+    source_lang: str = ""
+    target_lang: str = ""
 
     class Config:
         arbitrary_types_allowed = True
@@ -78,6 +87,8 @@ class Translation(BaseModel):
 
 class TranslationResponse(BaseModel):
     translations: List[Translation]
+    inpainted_image: str | None = None
+    rendered_image: str | None = None
     debug_folder: str = None  # 添加debug_folder字段
 
     def to_bytes(self):
@@ -86,17 +97,23 @@ class TranslationResponse(BaseModel):
 
 def to_translation(ctx: Context) -> TranslationResponse:
     text_regions:list[TextBlock] = ctx.text_regions
-    inpaint = ctx.img_inpainted
+    # Use the clean inpainted image (before rendering modified it in-place)
+    inpaint_clean = getattr(ctx, 'img_inpainted_clean', None)
+    inpaint = inpaint_clean if inpaint_clean is not None else ctx.img_inpainted
     translations:Dict[str, List[str]] = ctx.translations
     results = []
     for i, blk in enumerate(text_regions):
         minX, minY, maxX, maxY = blk.xyxy
         text_region = text_regions[i]
-        if 'translations' in ctx:
+        if 'translations' in ctx and translations:
             trans = {key: value[i] for key, value in translations.items()}
         else:
             trans = {}
+        # Always include source text
         trans[text_region.source_lang] = text_regions[i].text
+        # Always include translated text from the region (this is the primary translation result)
+        if text_region.translation:
+            trans[text_region.target_lang] = text_region.translation
         text_region.adjust_bg_color = False
         color1, color2 = text_region.get_font_colors()
         results.append(Translation(text=trans,
@@ -105,11 +122,35 @@ def to_translation(ctx: Context) -> TranslationResponse:
                     is_bulleted_list=text_region.is_bulleted_list,
                     text_color=TextColor(fg=color1.tolist(), bg=color2.tolist()),
                     prob=text_region.prob,
-                    angle=text_region.angle
+                    angle=text_region.angle,
+                    font_size=text_region.font_size,
+                    direction=text_region.direction,
+                    alignment=text_region.alignment,
+                    line_spacing=text_region.line_spacing,
+                    letter_spacing=text_region.letter_spacing,
+                    bold=text_region.bold,
+                    italic=text_region.italic,
+                    source_lang=text_region.source_lang,
+                    target_lang=text_region.target_lang,
         ))
         #todo: background angle
+
+    # Encode clean inpainted image (no text) for editor per-block backgrounds
+    inpainted_image_b64 = None
+    if inpaint is not None:
+        retval, buffer = cv2.imencode('.png', inpaint)
+        if retval:
+            inpainted_image_b64 = f"data:image/png;base64,{base64.b64encode(buffer).decode('utf-8')}"
+
+    # Encode rendered image (with translated text burned in) for preview
+    rendered_image_b64 = None
+    rendered = ctx.img_inpainted  # After rendering step, this has text burned in
+    if rendered is not None:
+        retval, buffer = cv2.imencode('.png', rendered)
+        if retval:
+            rendered_image_b64 = f"data:image/png;base64,{base64.b64encode(buffer).decode('utf-8')}"
 
     # 获取debug_folder信息
     debug_folder = getattr(ctx, 'debug_folder', None)
 
-    return TranslationResponse(translations=results, debug_folder=debug_folder)
+    return TranslationResponse(translations=results, inpainted_image=inpainted_image_b64, rendered_image=rendered_image_b64, debug_folder=debug_folder)

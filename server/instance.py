@@ -7,6 +7,12 @@ from pydantic import BaseModel
 from manga_translator import Config
 from server.sent_data_internal import fetch_data_stream, NotifyType, fetch_data
 
+_shared_nonce: str | None = None
+
+def set_shared_nonce(value: str):
+    global _shared_nonce
+    _shared_nonce = value
+
 class ExecutorInstance(BaseModel):
     ip: str
     port: int
@@ -15,21 +21,27 @@ class ExecutorInstance(BaseModel):
     def free_executor(self):
         self.busy = False
 
+    def _nonce_headers(self) -> dict:
+        from server.instance import _shared_nonce
+        if _shared_nonce:
+            return {"X-Nonce": _shared_nonce}
+        return {}
+
     async def sent(self, image: Image, config: Config):
-        return await fetch_data("http://"+self.ip+":"+str(self.port)+"/simple_execute/translate", image, config)
+        return await fetch_data("http://"+self.ip+":"+str(self.port)+"/simple_execute/translate", image, config, headers=self._nonce_headers())
 
     async def sent_stream(self, image: Image, config: Config, sender: NotifyType):
-        await fetch_data_stream("http://"+self.ip+":"+str(self.port)+"/execute/translate", image, config, sender)
+        await fetch_data_stream("http://"+self.ip+":"+str(self.port)+"/execute/translate", image, config, sender, headers=self._nonce_headers())
 
     async def sent_batch(self, images: List[Image.Image], config: Config, batch_size: int):
         """发送批量翻译请求"""
-        return await fetch_data("http://"+self.ip+":"+str(self.port)+"/simple_execute/translate_batch", 
-                               {"images": images, "config": config, "batch_size": batch_size})
+        return await fetch_data("http://"+self.ip+":"+str(self.port)+"/simple_execute/translate_batch",
+                               {"images": images, "config": config, "batch_size": batch_size}, headers=self._nonce_headers())
 
     async def sent_batch_stream(self, images: List[Image.Image], config: Config, batch_size: int, sender: NotifyType):
         """发送批量翻译流式请求"""
         await fetch_data_stream("http://"+self.ip+":"+str(self.port)+"/execute/translate_batch",
-                               {"images": images, "config": config, "batch_size": batch_size}, config, sender)
+                               {"images": images, "config": config, "batch_size": batch_size}, config, sender, headers=self._nonce_headers())
 
 class Executors:
     def __init__(self):

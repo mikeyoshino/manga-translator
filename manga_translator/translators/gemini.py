@@ -136,7 +136,7 @@ class GeminiTranslator(CommonGPTTranslator):
                             )
             self.logger.error('\n'.join(mName for mName in model_names))
 
-            raise
+            raise ValueError(f"Model '{GEMINI_MODEL}' not found in available models")
         
         # Use index of model name to get full model info
         model_info = model_list[model_names.index(GEMINI_MODEL)]
@@ -324,9 +324,10 @@ class GeminiTranslator(CommonGPTTranslator):
             nonlocal MAX_SPLIT_ATTEMPTS
             split_prefix = ' (split)' if split_level > 0 else ''  
 
-            # Assemble prompt for the current batch  
+            # Assemble prompt for the current batch
             prompt, query_size = self._assemble_prompts(from_lang, to_lang, prompt_queries).__next__()
 
+            server_error_attempt = 0
             for attempt in range(RETRY_ATTEMPTS):  
                 try:  
                     # Get the response (synchronously)

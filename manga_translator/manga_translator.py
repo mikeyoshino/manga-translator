@@ -298,7 +298,8 @@ class MangaTranslator:
         if params.get('model_dir'):
             ModelWrapper._MODEL_DIR = params.get('model_dir')
         #todo: fix why is kernel size loaded in the constructor
-        self.kernel_size=int(params.get('kernel_size'))
+        _ks = params.get('kernel_size')
+        self.kernel_size = int(_ks) if _ks is not None else None
         # Set input files
         self.input_files = params.get('input', [])
         # Set save_text
@@ -607,6 +608,10 @@ class MangaTranslator:
             folder_name = self._current_image_context['subfolder']
             # 发送特殊格式的消息，前端可以解析
             await self._report_progress(f'rendering_folder:{folder_name}')
+
+        # Save a copy of the inpainted image before rendering modifies it in-place
+        if ctx.img_inpainted is not None:
+            ctx.img_inpainted_clean = ctx.img_inpainted.copy()
 
         try:
             ctx.img_rendered = await self._run_text_rendering(config, ctx)
@@ -2555,6 +2560,10 @@ class MangaTranslator:
             folder_name = self._current_image_context['subfolder']
             # 发送特殊格式的消息，前端可以解析
             await self._report_progress(f'rendering_folder:{folder_name}')
+
+        # Save a copy of the inpainted image before rendering modifies it in-place
+        if ctx.img_inpainted is not None:
+            ctx.img_inpainted_clean = ctx.img_inpainted.copy()
 
         try:
             ctx.img_rendered = await self._run_text_rendering(config, ctx)

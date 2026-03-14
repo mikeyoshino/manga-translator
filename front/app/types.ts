@@ -124,3 +124,68 @@ export interface FinishedImage {
   finishedAt: Date;
   settings: TranslationSettings;
 }
+
+// --- Editor types ---
+
+export interface TextColor {
+  fg: [number, number, number];
+  bg: [number, number, number];
+}
+
+export interface TranslationBlock {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  is_bulleted_list: boolean;
+  angle: number;
+  prob: number;
+  text_color: TextColor;
+  text: Record<string, string>;
+  background: string;
+  font_size: number;
+  direction: string;
+  alignment: string;
+  line_spacing: number;
+  letter_spacing: number;
+  bold: boolean;
+  italic: boolean;
+  source_lang: string;
+  target_lang: string;
+}
+
+export interface EditableBlock extends TranslationBlock {
+  id: string;
+  editedText: string;
+  editedX: number;
+  editedY: number;
+  editedWidth: number;
+  editedHeight: number;
+  editedFontSize: number;
+  editedFontFamily: string;
+  editedColor: string;
+  editedLetterSpacing: number;
+  editedLineSpacing: number;
+  editedBold: boolean;
+  editedItalic: boolean;
+  editedAlignment: string;
+  editedStrokeEnabled: boolean;
+  editedStrokeColor: string;
+  editedStrokeWidth: number;
+  hidden: boolean;
+}
+
+export interface TranslationResponseJson {
+  translations: TranslationBlock[];
+  inpainted_image: string | null;
+  rendered_image: string | null;
+  debug_folder: string | null;
+}
+
+export interface EditorImage {
+  id: string;
+  originalFile: File;
+  translationResponse: TranslationResponseJson;
+  editableBlocks: EditableBlock[];
+  isDirty: boolean;
+}

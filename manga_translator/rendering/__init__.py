@@ -245,7 +245,13 @@ async def dispatch(
     disable_font_border: bool = False
     ) -> np.ndarray:
 
-    text_render.set_font(font_path)
+    # Use language-specific font if no explicit font_path and target language has one
+    if not font_path and text_regions:
+        target_lang = getattr(text_regions[0], 'target_lang', '')
+        lang_font = text_render.LANGUAGE_FONTS.get(target_lang, '')
+        text_render.set_font(lang_font)
+    else:
+        text_render.set_font(font_path)
     text_regions = list(filter(lambda region: region.translation, text_regions))
 
     # Resize regions that are too small

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Icon } from '@iconify/react';
 import type { FinishedImage } from '@/types';
 
@@ -13,6 +13,28 @@ export const ResultGallery: React.FC<ResultGalleryProps> = ({
 }) => {
   const [selectedImage, setSelectedImage] = useState<FinishedImage | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const urlCacheRef = useRef<Map<string, string>>(new Map());
+
+  // Filter to only images with valid Blob results
+  const validImages = finishedImages.filter(
+    (img) => img.result instanceof Blob
+  );
+
+  // Clean up blob URLs on unmount or when images change
+  useEffect(() => {
+    return () => {
+      urlCacheRef.current.forEach((url) => URL.revokeObjectURL(url));
+      urlCacheRef.current.clear();
+    };
+  }, []);
+
+  const getBlobUrl = (image: FinishedImage): string => {
+    const cached = urlCacheRef.current.get(image.id);
+    if (cached) return cached;
+    const url = URL.createObjectURL(image.result);
+    urlCacheRef.current.set(image.id, url);
+    return url;
+  };
 
   const openImageModal = (image: FinishedImage) => {
     setSelectedImage(image);
@@ -26,23 +48,23 @@ export const ResultGallery: React.FC<ResultGalleryProps> = ({
 
   const navigateImage = (direction: 'prev' | 'next') => {
     if (!selectedImage) return;
-    
-    const currentIndex = finishedImages.findIndex(img => img.id === selectedImage.id);
+
+    const currentIndex = validImages.findIndex(img => img.id === selectedImage.id);
     if (currentIndex === -1) return;
 
     let newIndex: number;
     if (direction === 'prev') {
-      newIndex = currentIndex === 0 ? finishedImages.length - 1 : currentIndex - 1;
+      newIndex = currentIndex === 0 ? validImages.length - 1 : currentIndex - 1;
     } else {
-      newIndex = currentIndex === finishedImages.length - 1 ? 0 : currentIndex + 1;
+      newIndex = currentIndex === validImages.length - 1 ? 0 : currentIndex + 1;
     }
 
-    setSelectedImage(finishedImages[newIndex]);
+    setSelectedImage(validImages[newIndex]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isModalOpen) return;
-    
+
     switch (e.key) {
       case 'Escape':
         closeImageModal();
@@ -56,7 +78,7 @@ export const ResultGallery: React.FC<ResultGalleryProps> = ({
     }
   };
 
-  if (finishedImages.length === 0) {
+  if (validImages.length === 0) {
     return (
       <div className="text-center py-12 text-gray-500">
         <Icon icon="carbon:image" className="w-12 h-12 mx-auto mb-4 text-gray-300" />
@@ -71,7 +93,7 @@ export const ResultGallery: React.FC<ResultGalleryProps> = ({
       {/* Gallery Header */}
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-800">
-          Translation Results ({finishedImages.length})
+          Translation Results ({validImages.length})
         </h3>
         <button
           onClick={onClearGallery}
@@ -83,7 +105,7 @@ export const ResultGallery: React.FC<ResultGalleryProps> = ({
 
       {/* Image Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {finishedImages.map((image) => (
+        {validImages.map((image) => (
           <div
             key={image.id}
             className="group cursor-pointer bg-white rounded-lg border hover:border-blue-400 hover:shadow-md transition-all duration-200"
@@ -91,7 +113,7 @@ export const ResultGallery: React.FC<ResultGalleryProps> = ({
           >
             <div className="relative aspect-square overflow-hidden rounded-t-lg">
               <img
-                src={URL.createObjectURL(image.result)}
+                src={getBlobUrl(image)}
                 alt={`Translated: ${image.originalName}`}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
               />
@@ -107,7 +129,9 @@ export const ResultGallery: React.FC<ResultGalleryProps> = ({
                 {image.originalName}
               </div>
               <div className="text-xs text-gray-400">
-                {image.finishedAt.toLocaleDateString()}
+                {image.finishedAt instanceof Date
+                  ? image.finishedAt.toLocaleDateString()
+                  : new Date(image.finishedAt).toLocaleDateString()}
               </div>
             </div>
           </div>
@@ -133,7 +157,7 @@ export const ResultGallery: React.FC<ResultGalleryProps> = ({
             >
               <Icon icon="carbon:chevron-left" className="w-6 h-6" />
             </button>
-            
+
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -154,7 +178,7 @@ export const ResultGallery: React.FC<ResultGalleryProps> = ({
 
             {/* Image */}
             <img
-              src={URL.createObjectURL(selectedImage.result)}
+              src={getBlobUrl(selectedImage)}
               alt={`Translated: ${selectedImage.originalName}`}
               className="max-w-full max-h-full object-contain"
               onClick={(e) => e.stopPropagation()}
@@ -164,7 +188,9 @@ export const ResultGallery: React.FC<ResultGalleryProps> = ({
             <div className="absolute bottom-4 left-4 right-4 bg-black bg-opacity-50 text-white p-3 rounded-lg">
               <div className="text-sm font-medium">{selectedImage.originalName}</div>
               <div className="text-xs text-gray-300">
-                Completed: {selectedImage.finishedAt.toLocaleString()}
+                Completed: {selectedImage.finishedAt instanceof Date
+                  ? selectedImage.finishedAt.toLocaleString()
+                  : new Date(selectedImage.finishedAt).toLocaleString()}
               </div>
               <div className="text-xs text-gray-300">
                 Translator: {selectedImage.settings.translator}
@@ -180,4 +206,4 @@ export const ResultGallery: React.FC<ResultGalleryProps> = ({
       )}
     </>
   );
-}; 
+};

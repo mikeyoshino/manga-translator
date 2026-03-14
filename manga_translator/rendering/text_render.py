@@ -208,10 +208,17 @@ def add_color(bw_char_map, color, stroke_char_map, stroke_color):
     return bg#, alpha_char_map
 
 FALLBACK_FONTS = [
+    os.path.join(BASE_PATH, 'fonts/Kanit-Regular.ttf'),
+    os.path.join(BASE_PATH, 'fonts/NotoSansThai-Regular.ttf'),
     os.path.join(BASE_PATH, 'fonts/Arial-Unicode-Regular.ttf'),
     os.path.join(BASE_PATH, 'fonts/msyh.ttc'),
     os.path.join(BASE_PATH, 'fonts/msgothic.ttc'),
 ]
+
+# Language-specific font paths (used when target_lang is known)
+LANGUAGE_FONTS = {
+    'THA': os.path.join(BASE_PATH, 'fonts/Kanit-Regular.ttf'),
+}
 FONT_SELECTION: List[freetype.Face] = []
 font_cache = {}
 def get_cached_font(path: str) -> freetype.Face:
@@ -1097,14 +1104,147 @@ def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canva
 
     return char_offset_x  # Return horizontal advance 返回水平步进距离
 
+# ---------------------------------------------------------------------------
+# Pillow-based Thai text renderer (handles combining marks correctly)
+# ---------------------------------------------------------------------------
+def _put_text_thai_pillow(font_size: int, text: str, width: int, height: int,
+                          alignment: str, fg: Tuple[int, int, int],
+                          bg: Optional[Tuple[int, int, int]], line_spacing_factor: float = 0):
+    """Render Thai text using Pillow which handles complex script shaping."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    try:
+        from pythainlp.tokenize import word_tokenize as _thai_tok
+    except ImportError:
+        _thai_tok = None
+
+    if not text or not text.strip():
+        return None
+
+    # Load font
+    font_path = LANGUAGE_FONTS.get('THA', FALLBACK_FONTS[0])
+    try:
+        pil_font = ImageFont.truetype(font_path, font_size)
+    except Exception:
+        pil_font = ImageFont.truetype(FALLBACK_FONTS[0], font_size)
+
+    border_size = int(max(font_size * 0.07, 1)) if bg is not None else 0
+    spacing_y = int(font_size * (line_spacing_factor if line_spacing_factor else 0.3))
+
+    # Word-wrap Thai text using pythainlp word segmentation
+    def wrap_thai(txt: str, max_w: int) -> list:
+        if _thai_tok:
+            words = _thai_tok(txt.strip())
+        else:
+            words = list(txt.strip())
+
+        lines = []
+        current = ""
+        # Use a temporary image for measuring
+        tmp = Image.new('L', (1, 1))
+        tmp_draw = ImageDraw.Draw(tmp)
+        for word in words:
+            test = current + word
+            bbox = tmp_draw.textbbox((0, 0), test, font=pil_font)
+            tw = bbox[2] - bbox[0]
+            if tw > max_w and current:
+                lines.append(current)
+                current = word
+            else:
+                current = test
+        if current:
+            lines.append(current)
+        return lines if lines else [txt]
+
+    lines = wrap_thai(text, max(width, font_size * 2))
+
+    # Measure all lines
+    tmp = Image.new('L', (1, 1))
+    tmp_draw = ImageDraw.Draw(tmp)
+    line_sizes = []
+    for ln in lines:
+        bbox = tmp_draw.textbbox((0, 0), ln, font=pil_font)
+        line_sizes.append((bbox[2] - bbox[0], bbox[3] - bbox[1]))
+
+    max_line_w = max(s[0] for s in line_sizes)
+    line_h = int(font_size * 1.4)  # Thai needs extra height for marks
+    total_h = line_h * len(lines) + spacing_y * (len(lines) - 1)
+
+    # Canvas with padding
+    pad = font_size + border_size
+    canvas_w = max_line_w + pad * 2
+    canvas_h = total_h + pad * 2
+
+    # Create RGBA image
+    img = Image.new('RGBA', (canvas_w, canvas_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    # Map alignment
+    pil_align = 'center'
+    if alignment == 'left':
+        pil_align = 'left'
+    elif alignment == 'right':
+        pil_align = 'right'
+
+    # Draw border/stroke first (draw text multiple times offset)
+    y_cursor = pad
+    for ln in lines:
+        bbox = draw.textbbox((0, 0), ln, font=pil_font)
+        lw = bbox[2] - bbox[0]
+        if pil_align == 'center':
+            x = pad + (max_line_w - lw) // 2
+        elif pil_align == 'right':
+            x = pad + max_line_w - lw
+        else:
+            x = pad
+
+        if border_size > 0 and bg is not None:
+            bg_color = (bg[0], bg[1], bg[2], 255)  # fg/bg are already RGB
+            for dx in range(-border_size, border_size + 1):
+                for dy in range(-border_size, border_size + 1):
+                    if dx * dx + dy * dy <= border_size * border_size:
+                        draw.text((x + dx, y_cursor + dy), ln, font=pil_font, fill=bg_color)
+
+        # Draw foreground text
+        fg_color = (fg[0], fg[1], fg[2], 255)  # fg/bg are already RGB
+        draw.text((x, y_cursor), ln, font=pil_font, fill=fg_color)
+        y_cursor += line_h + spacing_y
+
+    # Convert to numpy BGRA
+    arr = np.array(img)
+    # Pillow is RGBA, OpenCV uses BGRA — swap R and B channels
+    # Keep as RGBA — the compositor uses channels 0,1,2 directly matching the color tuple order
+    bgra = arr
+
+    # Crop to content
+    alpha = bgra[:, :, 3]
+    coords = cv2.findNonZero(alpha)
+    if coords is None:
+        return None
+    x, y, w, h = cv2.boundingRect(coords)
+    return bgra[y:y+h, x:x+w]
+
+
 def put_text_horizontal(font_size: int, text: str, width: int, height: int, alignment: str,
                         reversed_direction: bool, fg: Tuple[int, int, int], bg: Tuple[int, int, int],
                         lang: str = 'en_US', hyphenate: bool = True, line_spacing: int = 0):
     text = compact_special_symbols(text)
     if not text :
         return
+
+    # Use Pillow-based renderer for Thai (proper combining mark handling)
+    if lang and (lang.upper().startswith('TH') or lang.upper() == 'THA'):
+        result = _put_text_thai_pillow(font_size, text, width, height, alignment, fg, bg, line_spacing)
+        if result is not None:
+            return result
     bg_size = int(max(font_size * 0.07, 1)) if bg is not None else 0
-    spacing_y = int(font_size * (line_spacing or 0.01))
+    # Thai tone marks and vowels extend above/below, need more line spacing
+    if line_spacing:
+        spacing_y = int(font_size * line_spacing)
+    elif lang and lang.upper().startswith('TH'):
+        spacing_y = int(font_size * 0.25)
+    else:
+        spacing_y = int(font_size * 0.01)
 
     # calc
     # print(width)

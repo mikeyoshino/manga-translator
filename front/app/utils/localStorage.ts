@@ -21,32 +21,17 @@ export const saveSettings = (settings: TranslationSettings): void => {
   }
 };
 
+// Note: FinishedImage contains Blob data which cannot be serialized to localStorage.
+// These functions are kept as no-ops to avoid breaking callers.
+// Finished images only persist within the current session.
 export const loadFinishedImages = (): FinishedImage[] => {
-  try {
-    const stored = localStorage.getItem(FINISHED_IMAGES_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch (error) {
-    console.warn('Failed to load finished images from localStorage:', error);
-    return [];
-  }
+  return [];
 };
 
-export const saveFinishedImages = (images: FinishedImage[]): void => {
-  try {
-    // Keep only the last 50 images to prevent localStorage from getting too large
-    const limitedImages = images.slice(-50);
-    localStorage.setItem(FINISHED_IMAGES_KEY, JSON.stringify(limitedImages));
-  } catch (error) {
-    console.warn('Failed to save finished images to localStorage:', error);
-  }
+export const saveFinishedImages = (_images: FinishedImage[]): void => {
+  // no-op: Blobs cannot be stored in localStorage
 };
 
-export const addFinishedImage = (image: FinishedImage): void => {
-  try {
-    const existing = loadFinishedImages();
-    const updated = [image, ...existing]; // Add new image at the top
-    saveFinishedImages(updated);
-  } catch (error) {
-    console.warn('Failed to add finished image to localStorage:', error);
-  }
+export const addFinishedImage = (_image: FinishedImage): void => {
+  // no-op: Blobs cannot be stored in localStorage
 }; 

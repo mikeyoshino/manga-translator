@@ -74,7 +74,7 @@ export const ImageHandlingArea: React.FC<ImageHandlingAreaProps> = ({
               const status = fileStatuses.get(file.name);
               return (
                 <div key={file.name} className="relative">
-                  <div className="relative w-full min-h-[400px] max-h-[600px] group">
+                  <div className="relative w-full max-h-[70vh] overflow-hidden group">
                     {/* Delete button - displayed when uploading */}
                     {!isProcessing && !isProcessingAllFinished && (
                       <button
@@ -88,7 +88,7 @@ export const ImageHandlingArea: React.FC<ImageHandlingAreaProps> = ({
 
                     <PreviewImage
                       file={file}
-                      result={status?.result as File | null}
+                      result={status?.result ?? null}
                     />
 
                     {/* Status overlay */}
