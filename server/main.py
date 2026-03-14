@@ -10,10 +10,13 @@ import asyncio
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from dotenv import load_dotenv
+load_dotenv()
 
-from fastapi import FastAPI, Request, HTTPException, Header, UploadFile, File, Form
+
+from fastapi import FastAPI, Request, HTTPException, Header, UploadFile, File, Form, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
+from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
@@ -22,6 +25,9 @@ from server.instance import ExecutorInstance, executor_instances
 from server.myqueue import task_queue
 from server.request_extraction import get_ctx, while_streaming, TranslateRequest, BatchTranslateRequest, get_batch_ctx
 from server.to_json import to_translation, TranslationResponse
+from server.auth import AuthUser, get_current_user
+import server.supabase_client as sb
+import server.payment as payment_svc
 
 app = FastAPI()
 nonce = None
@@ -30,13 +36,17 @@ BASE_DIR = Path(__file__).resolve().parent
 RESULT_ROOT = (BASE_DIR.parent / "result").resolve()
 RESULT_ROOT.mkdir(parents=True, exist_ok=True)
 
+ALLOWED_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+TOKEN_COST_PER_IMAGE = int(os.getenv("TOKEN_COST_PER_IMAGE", "1"))
 
 # 添加result文件夹静态文件服务
 if RESULT_ROOT.exists():
@@ -100,21 +110,27 @@ async def stream_image(req: Request, data: TranslateRequest) -> StreamingRespons
     return await while_streaming(req, transform_to_image, data.config, data.image)
 
 @app.post("/translate/with-form/json", response_model=TranslationResponse, tags=["api", "form"],response_description="json strucure inspired by the ichigo translator extension")
-async def json_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
+async def json_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)):
+    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="translate/json", channel="api"):
+        raise HTTPException(status_code=402, detail="Insufficient tokens")
     img = await image.read()
     conf = Config.parse_raw(config)
     ctx = await get_ctx(req, conf, img)
     return to_translation(ctx)
 
 @app.post("/translate/with-form/bytes", response_class=StreamingResponse, tags=["api", "form"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
-async def bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
+async def bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)):
+    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="translate/bytes", channel="api"):
+        raise HTTPException(status_code=402, detail="Insufficient tokens")
     img = await image.read()
     conf = Config.parse_raw(config)
     ctx = await get_ctx(req, conf, img)
     return StreamingResponse(content=to_translation(ctx).to_bytes())
 
 @app.post("/translate/with-form/image", response_description="the result image", tags=["api", "form"],response_class=StreamingResponse)
-async def image_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> StreamingResponse:
+async def image_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)) -> StreamingResponse:
+    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="translate/image", channel="api"):
+        raise HTTPException(status_code=402, detail="Insufficient tokens")
     img = await image.read()
     conf = Config.parse_raw(config)
     ctx = await get_ctx(req, conf, img)
@@ -125,7 +141,9 @@ async def image_form(req: Request, image: UploadFile = File(...), config: str = 
     return StreamingResponse(img_byte_arr, media_type="image/png")
 
 @app.post("/translate/with-form/json/stream", response_class=StreamingResponse, tags=["api", "form"],response_description="A stream over elements with strucure(1byte status, 4 byte size, n byte data) status code are 0,1,2,3,4 0 is result data, 1 is progress report, 2 is error, 3 is waiting queue position, 4 is waiting for translator instance")
-async def stream_json_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> StreamingResponse:
+async def stream_json_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)) -> StreamingResponse:
+    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="translate/json/stream", channel="api"):
+        raise HTTPException(status_code=402, detail="Insufficient tokens")
     img = await image.read()
     conf = Config.parse_raw(config)
     # 标记这是Web前端调用，用于占位符优化
@@ -135,13 +153,17 @@ async def stream_json_form(req: Request, image: UploadFile = File(...), config: 
 
 
 @app.post("/translate/with-form/bytes/stream", response_class=StreamingResponse,tags=["api", "form"], response_description="A stream over elements with strucure(1byte status, 4 byte size, n byte data) status code are 0,1,2,3,4 0 is result data, 1 is progress report, 2 is error, 3 is waiting queue position, 4 is waiting for translator instance")
-async def stream_bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"))-> StreamingResponse:
+async def stream_bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user))-> StreamingResponse:
+    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="translate/bytes/stream", channel="api"):
+        raise HTTPException(status_code=402, detail="Insufficient tokens")
     img = await image.read()
     conf = Config.parse_raw(config)
     return await while_streaming(req, transform_to_bytes, conf, img)
 
 @app.post("/translate/with-form/image/stream", response_class=StreamingResponse, tags=["api", "form"], response_description="Standard streaming endpoint - returns complete image data. Suitable for API calls and scripts.")
-async def stream_image_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> StreamingResponse:
+async def stream_image_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)) -> StreamingResponse:
+    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="translate/image/stream", channel="api"):
+        raise HTTPException(status_code=402, detail="Insufficient tokens")
     """通用流式端点：返回完整图片数据，适用于API调用和comicread脚本"""
     img = await image.read()
     conf = Config.parse_raw(config)
@@ -150,7 +172,9 @@ async def stream_image_form(req: Request, image: UploadFile = File(...), config:
     return await while_streaming(req, transform_to_image, conf, img)
 
 @app.post("/translate/with-form/image/stream/web", response_class=StreamingResponse, tags=["api", "form"], response_description="Web frontend optimized streaming endpoint - uses placeholder optimization for faster response.")
-async def stream_image_form_web(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> StreamingResponse:
+async def stream_image_form_web(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)) -> StreamingResponse:
+    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="translate/image/stream/web", channel="api"):
+        raise HTTPException(status_code=402, detail="Insufficient tokens")
     """Web前端专用端点：使用占位符优化，提供极速体验"""
     img = await image.read()
     conf = Config.parse_raw(config)
@@ -383,6 +407,144 @@ async def delete_result(folder_name: str):
         return {"message": f"Deleted result directory: {folder_name}"}
     except Exception as e:
         raise HTTPException(500, detail=f"Error deleting result: {str(e)}")
+
+# ============================================================
+# User profile & token endpoints
+# ============================================================
+
+@app.get("/user/profile", tags=["user"])
+async def user_profile(user: AuthUser = Depends(get_current_user)):
+    profile = sb.get_user_profile(user.id)
+    profile["is_admin"] = user.is_admin
+    return profile
+
+
+@app.get("/user/transactions", tags=["user"])
+async def user_transactions(
+    user: AuthUser = Depends(get_current_user),
+    limit: int = Query(default=50, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    txns = sb.get_transactions(user.id, limit=limit, offset=offset)
+    return txns
+
+
+# ============================================================
+# Payment endpoints (Omise PromptPay)
+# ============================================================
+
+from pydantic import BaseModel as _BaseModel
+
+class CreateChargeRequest(_BaseModel):
+    token_amount: int  # must be one of the TOKEN_PACKAGES keys
+    payment_method: str = "promptpay"  # "promptpay" or "card"
+    card_token: str | None = None  # Omise token from frontend (required for card)
+
+
+@app.post("/payment/create-charge", tags=["payment"])
+async def create_charge(body: CreateChargeRequest, user: AuthUser = Depends(get_current_user)):
+    try:
+        if body.payment_method == "card":
+            if not body.card_token:
+                raise HTTPException(status_code=400, detail="card_token is required for card payment")
+            charge_data = payment_svc.create_card_charge(user.id, body.token_amount, body.card_token)
+        else:
+            charge_data = payment_svc.create_promptpay_charge(user.id, body.token_amount)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Payment error: {e}")
+
+    # Record pending payment
+    client = sb._get_client()
+    client.table("payments").insert({
+        "user_id": user.id,
+        "omise_charge_id": charge_data["charge_id"],
+        "amount_satangs": charge_data["amount_satangs"],
+        "tokens_to_credit": charge_data["tokens_to_credit"],
+        "status": "pending",
+    }).execute()
+
+    # For card payments that are immediately successful (no 3DS), credit tokens now
+    if body.payment_method == "card" and charge_data.get("paid"):
+        sb.credit_tokens(
+            user_id=user.id,
+            amount=charge_data["tokens_to_credit"],
+            type_="topup",
+            reference=charge_data["charge_id"],
+            channel="card",
+        )
+        client.table("payments").update({
+            "status": "successful",
+        }).eq("omise_charge_id", charge_data["charge_id"]).execute()
+
+    return charge_data
+
+
+@app.post("/payment/webhook", tags=["payment"])
+async def payment_webhook(request: Request):
+    """Omise webhook — no auth, but signature-verified."""
+    body = await request.json()
+
+    event = payment_svc.parse_webhook_event(body)
+    if event is None:
+        return JSONResponse({"ok": True, "message": "ignored"})
+
+    client = sb._get_client()
+
+    if event["status"] == "successful" and event["user_id"] and event["tokens_to_credit"]:
+        # Credit tokens
+        sb.credit_tokens(
+            user_id=event["user_id"],
+            amount=int(event["tokens_to_credit"]),
+            type_="topup",
+            reference=event["charge_id"],
+            channel=event.get("payment_method", "unknown"),
+        )
+        # Update payment record
+        client.table("payments").update({
+            "status": "successful",
+        }).eq("omise_charge_id", event["charge_id"]).execute()
+    else:
+        # Mark as failed
+        client.table("payments").update({
+            "status": "failed",
+        }).eq("omise_charge_id", event["charge_id"]).execute()
+
+    return JSONResponse({"ok": True})
+
+
+@app.post("/payment/check-charge", tags=["payment"])
+async def check_charge(body: dict, user: AuthUser = Depends(get_current_user)):
+    """Poll Omise charge status — credits tokens if successful. Used as webhook fallback."""
+    charge_id = body.get("charge_id")
+    if not charge_id:
+        raise HTTPException(status_code=400, detail="charge_id required")
+
+    import omise as _omise
+    payment_svc._init_omise()
+
+    try:
+        charge = _omise.Charge.retrieve(charge_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve charge: {e}")
+
+    if charge.status == "successful" and charge.paid:
+        client = sb._get_client()
+        # Check if already credited
+        existing = client.table("payments").select("status").eq("omise_charge_id", charge_id).single().execute()
+        if existing.data and existing.data.get("status") != "successful":
+            metadata = charge.metadata or {}
+            tokens = int(metadata.get("tokens_to_credit", 0))
+            uid = metadata.get("user_id", user.id)
+            if tokens > 0:
+                sb.credit_tokens(user_id=uid, amount=tokens, type_="topup", reference=charge_id, channel=metadata.get("payment_method", "unknown"))
+                client.table("payments").update({"status": "successful"}).eq("omise_charge_id", charge_id).execute()
+
+    return {"status": charge.status, "paid": charge.paid}
+
 
 #todo: restart if crash
 #todo: cache results

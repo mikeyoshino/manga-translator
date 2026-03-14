@@ -1,5 +1,6 @@
 import type { Route } from "./+types/home";
 import { App } from "../App";
+import { AuthGuard } from "@/components/AuthGuard";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -9,5 +10,9 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function Home() {
-  return <App />;
+  return (
+    <AuthGuard>
+      <App />
+    </AuthGuard>
+  );
 }

@@ -1,9 +1,19 @@
 import { Disclosure } from "@headlessui/react";
 import React from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useNavigate } from "react-router";
 
 type Props = {};
 
 export const Header: React.FC<Props> = () => {
+  const { user, tokenBalance, isAdmin, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
+  };
+
   return (
     <Disclosure as="nav" className="bg-white shadow">
       <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
@@ -27,6 +37,39 @@ export const Header: React.FC<Props> = () => {
               </a>
             </div>
           </div>
+
+          {/* Right side: token balance + user menu */}
+          {user && (
+            <div className="flex items-center space-x-4">
+              {isAdmin ? (
+                <span className="px-3 py-1.5 bg-amber-100 text-amber-800 rounded-full text-sm font-medium">
+                  Admin (Unlimited)
+                </span>
+              ) : (
+                <button
+                  onClick={() => navigate("/topup")}
+                  className="flex items-center space-x-1 px-3 py-1.5 bg-teal-50 text-teal-700 rounded-full hover:bg-teal-100 transition-colors text-sm font-medium"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.732 6.232a2.5 2.5 0 0 1 3.536 0 .75.75 0 1 0 1.06-1.06A4 4 0 0 0 6.5 8h-.25a.75.75 0 0 0 0 1.5H8.5a.5.5 0 0 1 0 1H6.75a.75.75 0 0 0 0 1.5h.25a4 4 0 0 0 6.828-2.828.75.75 0 1 0-1.06 1.06 2.5 2.5 0 0 1-3.536 0 .75.75 0 0 0-.494-.232H8.5a2 2 0 0 1 0-4h.232Z" clipRule="evenodd" />
+                  </svg>
+                  <span>{tokenBalance} tokens</span>
+                </button>
+              )}
+
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-500 hidden sm:inline">
+                  {user.email}
+                </span>
+                <button
+                  onClick={handleSignOut}
+                  className="text-sm text-gray-500 hover:text-gray-700 px-2 py-1 rounded transition-colors"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Disclosure>

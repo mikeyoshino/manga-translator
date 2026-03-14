@@ -10,14 +10,21 @@ export interface JsonStreamCallbacks {
 export async function translateWithJsonStream(
   file: File,
   config: string,
-  callbacks: JsonStreamCallbacks
+  callbacks: JsonStreamCallbacks,
+  accessToken?: string
 ): Promise<void> {
   const formData = new FormData();
   formData.append("image", file);
   formData.append("config", config);
 
+  const headers: Record<string, string> = {};
+  if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
+  }
+
   const response = await fetch(`/api/translate/with-form/json/stream`, {
     method: "POST",
+    headers,
     body: formData,
   });
 
