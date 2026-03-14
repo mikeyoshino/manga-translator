@@ -27,7 +27,7 @@ export function EditorToolbar() {
   const handleExportCurrent = useCallback(() => {
     const stageEl = document.querySelector(".konva-stage canvas") as HTMLCanvasElement | null;
     if (stageEl && currentImage) {
-      exportSingleImage(stageEl, currentImage.originalFile.name);
+      exportSingleImage(stageEl, currentImage.originalFilename);
     }
   }, [currentImage]);
 
@@ -68,7 +68,7 @@ export function EditorToolbar() {
 
       {currentImage && (
         <span className="text-xs text-slate-400 ml-2 truncate max-w-48">
-          {currentImage.originalFile.name}
+          {currentImage.originalFilename}
         </span>
       )}
 

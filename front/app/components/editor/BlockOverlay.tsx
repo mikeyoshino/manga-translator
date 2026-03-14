@@ -52,6 +52,7 @@ export function BlockOverlay({
     }
     let cancelled = false;
     const img = new window.Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => {
       if (!cancelled) setBgCropImage(img);
     };

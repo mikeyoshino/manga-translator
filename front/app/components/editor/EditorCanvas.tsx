@@ -36,24 +36,27 @@ export function EditorCanvas() {
 
   // Load original image as base (text outside blocks stays visible)
   useEffect(() => {
-    if (!currentImage?.originalFile) {
+    const src = currentImage?.originalFile
+      ? URL.createObjectURL(currentImage.originalFile)
+      : currentImage?.originalImageUrl;
+    if (!src) {
       setBgImage(null);
       return;
     }
     let cancelled = false;
-    const url = URL.createObjectURL(currentImage.originalFile);
     const img = new window.Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => {
       if (!cancelled) setBgImage(img);
     };
-    img.src = url;
+    img.src = src;
     return () => {
       cancelled = true;
       img.onload = null;
       img.src = "";
-      URL.revokeObjectURL(url);
+      if (currentImage?.originalFile) URL.revokeObjectURL(src);
     };
-  }, [currentImage?.originalFile]);
+  }, [currentImage?.originalFile, currentImage?.originalImageUrl]);
 
   // Resize observer
   useEffect(() => {

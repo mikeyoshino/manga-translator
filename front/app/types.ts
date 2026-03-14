@@ -184,8 +184,43 @@ export interface TranslationResponseJson {
 
 export interface EditorImage {
   id: string;
-  originalFile: File;
+  originalFile: File | null;
+  originalImageUrl: string | null;
+  originalFilename: string;
+  projectImageId: string | null;
   translationResponse: TranslationResponseJson;
   editableBlocks: EditableBlock[];
   isDirty: boolean;
+}
+
+// --- Project types ---
+
+export interface Project {
+  id: string;
+  name: string;
+  created_at: string;
+  expires_at: string;
+  updated_at: string;
+  image_count: number;
+  thumbnail_url: string | null;
+}
+
+export interface ProjectImage {
+  id: string;
+  project_id: string;
+  sequence: number;
+  original_filename: string;
+  original_image_path: string;
+  original_image_url: string;
+  inpainted_image_url: string | null;
+  rendered_image_url: string | null;
+  translation_metadata: {
+    translations: (TranslationBlock & {
+      background_url?: string;
+      background_path?: string;
+    })[];
+    debug_folder: string | null;
+  } | null;
+  editable_blocks: EditableBlock[] | null;
+  status: "uploaded" | "translating" | "translated" | "error";
 }

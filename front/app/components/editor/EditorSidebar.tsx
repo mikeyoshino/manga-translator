@@ -30,7 +30,7 @@ function SidebarThumb({
   isActive,
   onClick,
 }: {
-  image: { id: string; originalFile: File; isDirty: boolean };
+  image: { id: string; originalFile: File | null; originalImageUrl: string | null; isDirty: boolean };
   index: number;
   isActive: boolean;
   onClick: () => void;
@@ -38,10 +38,14 @@ function SidebarThumb({
   const [thumbUrl, setThumbUrl] = useState<string>("");
 
   useEffect(() => {
-    const url = URL.createObjectURL(image.originalFile);
-    setThumbUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [image.originalFile]);
+    if (image.originalFile) {
+      const url = URL.createObjectURL(image.originalFile);
+      setThumbUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else if (image.originalImageUrl) {
+      setThumbUrl(image.originalImageUrl);
+    }
+  }, [image.originalFile, image.originalImageUrl]);
 
   return (
     <button

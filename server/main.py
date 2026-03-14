@@ -28,6 +28,7 @@ from server.to_json import to_translation, TranslationResponse
 from server.auth import AuthUser, get_current_user
 import server.supabase_client as sb
 import server.payment as payment_svc
+import server.projects as projects
 
 app = FastAPI()
 nonce = None
@@ -316,6 +317,8 @@ def prepare(args):
     if os.path.exists(folder_name):
         shutil.rmtree(folder_name)
     os.makedirs(folder_name)
+    # Cleanup expired projects on startup
+    projects.cleanup_expired()
 
 @app.post("/simple_execute/translate_batch", tags=["internal-api"])
 async def simple_execute_batch(req: Request, data: BatchTranslateRequest):
@@ -544,6 +547,112 @@ async def check_charge(body: dict, user: AuthUser = Depends(get_current_user)):
                 client.table("payments").update({"status": "successful"}).eq("omise_charge_id", charge_id).execute()
 
     return {"status": charge.status, "paid": charge.paid}
+
+
+# ============================================================
+# Project endpoints
+# ============================================================
+
+@app.post("/projects", tags=["projects"])
+async def create_project_endpoint(body: dict, user: AuthUser = Depends(get_current_user)):
+    try:
+        return projects.create_project(user.id, body["name"])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/projects", tags=["projects"])
+async def list_projects_endpoint(user: AuthUser = Depends(get_current_user)):
+    return projects.list_projects(user.id)
+
+
+@app.get("/projects/{project_id}", tags=["projects"])
+async def get_project_endpoint(project_id: str, user: AuthUser = Depends(get_current_user)):
+    data = projects.get_project(project_id, user.id)
+    if not data:
+        raise HTTPException(404, "Project not found")
+    return data
+
+
+@app.put("/projects/{project_id}", tags=["projects"])
+async def update_project_endpoint(project_id: str, body: dict, user: AuthUser = Depends(get_current_user)):
+    if "name" in body:
+        projects.rename_project(project_id, user.id, body["name"])
+    return {"ok": True}
+
+
+@app.delete("/projects/{project_id}", tags=["projects"])
+async def delete_project_endpoint(project_id: str, user: AuthUser = Depends(get_current_user)):
+    projects.delete_project(project_id, user.id)
+    return {"ok": True}
+
+
+@app.post("/projects/{project_id}/images", tags=["projects"])
+async def upload_project_images(
+    project_id: str,
+    images: list[UploadFile] = File(...),
+    user: AuthUser = Depends(get_current_user),
+):
+    results = []
+    for idx, img in enumerate(images):
+        data = await img.read()
+        ct = img.content_type or "image/png"
+        row = projects.upload_image(project_id, user.id, data, img.filename or f"image_{idx}.png", ct, idx)
+        results.append(row)
+    return results
+
+
+@app.delete("/projects/{project_id}/images/{image_id}", tags=["projects"])
+async def delete_project_image(project_id: str, image_id: str, user: AuthUser = Depends(get_current_user)):
+    projects.delete_image(image_id, user.id)
+    return {"ok": True}
+
+
+@app.post("/projects/{project_id}/images/{image_id}/translate", tags=["projects"])
+async def translate_project_image(
+    req: Request, project_id: str, image_id: str,
+    config: str = Form("{}"),
+    user: AuthUser = Depends(get_current_user),
+):
+    """Translate a project image: download from Storage, translate, save results back."""
+    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference=f"project/{project_id}", channel="api"):
+        raise HTTPException(status_code=402, detail="Insufficient tokens")
+
+    img_row = projects.get_image(image_id)
+    if not img_row:
+        raise HTTPException(404, "Image not found")
+
+    projects.update_image_status(image_id, "translating")
+
+    try:
+        img_bytes = projects.download_image(img_row["original_image_path"])
+    except Exception as e:
+        projects.update_image_status(image_id, "error")
+        raise HTTPException(500, f"Failed to download image: {e}")
+
+    conf = Config.parse_raw(config)
+    conf._is_web_frontend = True
+
+    # Use the standard streaming pipeline — the result JSON will be saved to DB after streaming
+    return await while_streaming(req, transform_to_json, conf, img_bytes)
+
+
+@app.post("/projects/{project_id}/images/{image_id}/save-result", tags=["projects"])
+async def save_project_image_result(
+    project_id: str, image_id: str, body: dict,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Save translation result from frontend to Storage + DB."""
+    translation_response = body.get("translation_response", {})
+    editable_blocks = body.get("editable_blocks", [])
+    projects.save_translation_result(user.id, project_id, image_id, translation_response, editable_blocks)
+    return projects.get_image_with_urls(image_id)
+
+
+@app.put("/projects/{project_id}/images/{image_id}/blocks", tags=["projects"])
+async def save_image_blocks(project_id: str, image_id: str, body: dict, user: AuthUser = Depends(get_current_user)):
+    projects.save_editable_blocks(image_id, body["editable_blocks"])
+    return {"ok": True}
 
 
 #todo: restart if crash

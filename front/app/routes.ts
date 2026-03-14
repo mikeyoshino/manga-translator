@@ -6,4 +6,5 @@ export default [
   route("login", "routes/login.tsx"),
   route("topup", "routes/topup.tsx"),
   route("token-usage", "routes/token-usage.tsx"),
+  route("projects/:projectId", "routes/project.tsx"),
 ] satisfies RouteConfig;

@@ -34,7 +34,7 @@ export async function exportAllAsZip(
     if (!blob) continue;
 
     const name =
-      img.originalFile.name.replace(/\.[^.]+$/, "") + "_edited.png";
+      img.originalFilename.replace(/\.[^.]+$/, "") + "_edited.png";
     zip.file(name, blob);
   }
 
