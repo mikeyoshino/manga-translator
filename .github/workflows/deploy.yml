@@ -80,11 +80,32 @@ jobs:
     steps:
       - name: Update RunPod template image
         run: |
+          # Fetch current template to preserve existing settings
+          CURRENT=$(curl -s -X POST "https://api.runpod.io/graphql?api_key=${{ secrets.RUNPOD_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"query": "{ myself { endpoints { template { id name dockerArgs containerDiskInGb volumeInGb env { key value } } } } }"}')
+
+          # Extract current values (preserve env vars, disk, etc.)
+          TEMPLATE_NAME=$(echo "$CURRENT" | python3 -c "import sys,json; t=json.load(sys.stdin)['data']['myself']['endpoints'][0]['template']; print(t['name'])")
+          DOCKER_ARGS=$(echo "$CURRENT" | python3 -c "import sys,json; t=json.load(sys.stdin)['data']['myself']['endpoints'][0]['template']; print(t['dockerArgs'] or '')")
+          DISK=$(echo "$CURRENT" | python3 -c "import sys,json; t=json.load(sys.stdin)['data']['myself']['endpoints'][0]['template']; print(t['containerDiskInGb'])")
+          VOL=$(echo "$CURRENT" | python3 -c "import sys,json; t=json.load(sys.stdin)['data']['myself']['endpoints'][0]['template']; print(t['volumeInGb'])")
+          ENV_JSON=$(echo "$CURRENT" | python3 -c "import sys,json; t=json.load(sys.stdin)['data']['myself']['endpoints'][0]['template']; print(json.dumps([{'key':e['key'],'value':e['value']} for e in t['env']]))")
+
+          echo "Current template: $TEMPLATE_NAME, disk: $DISK, vol: $VOL, env vars: $(echo "$ENV_JSON" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")"
+
+          # Build mutation with preserved settings + new image
+          MUTATION=$(python3 -c "
+          import json
+          env = json.loads('$ENV_JSON')
+          env_str = json.dumps(env)
+          q = 'mutation { saveTemplate(input: { id: \"${{ secrets.RUNPOD_TEMPLATE_ID }}\", name: \"$TEMPLATE_NAME\", imageName: \"${{ env.RUNPOD_IMAGE }}:${{ github.sha }}\", dockerArgs: \"$DOCKER_ARGS\", containerDiskInGb: $DISK, volumeInGb: $VOL, env: ' + env_str + ' }) { id imageName } }'
+          print(json.dumps({'query': q}))
+          ")
+
           RESPONSE=$(curl -s -X POST "https://api.runpod.io/graphql?api_key=${{ secrets.RUNPOD_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{
-              "query": "mutation { saveTemplate(input: { id: \"${{ secrets.RUNPOD_TEMPLATE_ID }}\", name: \"manga-translator-worker\", imageName: \"${{ env.RUNPOD_IMAGE }}:${{ github.sha }}\", dockerArgs: \"\", containerDiskInGb: 20, volumeInGb: 0, env: [] }) { id imageName } }"
-            }')
+            -d "$MUTATION")
           echo "RunPod API response: $RESPONSE"
           if echo "$RESPONSE" | grep -q '"errors"'; then
             echo "ERROR: RunPod API returned errors"
