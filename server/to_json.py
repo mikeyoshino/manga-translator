@@ -6,8 +6,8 @@ import cv2
 import numpy as np
 from pydantic import BaseModel, Field, WithJsonSchema
 
-from manga_translator import Context
-from manga_translator.utils import TextBlock
+from manga_translator.utils.generic import Context
+from manga_translator.utils.textblock import TextBlock
 
 
 #input:PIL,
