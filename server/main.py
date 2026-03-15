@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from manga_translator.config import Config
-from server.myqueue import task_queue
+from server.myqueue import task_queue, WORKER_MODE
 from server.instance import worker_registry
 from server.request_extraction import get_ctx, while_streaming, TranslateRequest, BatchTranslateRequest, get_batch_ctx
 from server.to_json import to_translation, TranslationResponse
@@ -66,11 +66,15 @@ if RESULT_ROOT.exists():
 
 @app.on_event("startup")
 async def _startup():
-    from server.redis_client import ensure_consumer_group, ping
-    if not await ping():
+    if WORKER_MODE == "runpod":
         import logging
-        logging.getLogger("server").warning("Redis is not reachable at startup — workers won't receive jobs until Redis is available")
-    await ensure_consumer_group()
+        logging.getLogger("server").info("WORKER_MODE=runpod — skipping Redis consumer group setup")
+    else:
+        from server.redis_client import ensure_consumer_group, ping
+        if not await ping():
+            import logging
+            logging.getLogger("server").warning("Redis is not reachable at startup — workers won't receive jobs until Redis is available")
+        await ensure_consumer_group()
     # Cleanup expired projects
     projects.cleanup_expired()
 
@@ -87,18 +91,28 @@ async def _shutdown():
 
 @app.get("/health", tags=["api"])
 async def health():
-    from server.redis_client import ping, get_queue_length, active_worker_count
-    redis_ok = await ping()
-    queue_len = await get_queue_length() if redis_ok else -1
-    workers = await active_worker_count() if redis_ok else 0
-    status = "healthy" if redis_ok else "degraded"
-    return {
-        "status": status,
-        "redis": redis_ok,
-        "queue_length": queue_len,
-        "active_workers": workers,
+    result = {
+        "status": "healthy",
+        "worker_mode": WORKER_MODE,
         "sentry_enabled": bool(os.getenv("SENTRY_DSN", "")),
     }
+
+    if WORKER_MODE == "runpod":
+        from server.runpod_adapter import check_health
+        runpod_health = await check_health()
+        result["runpod"] = runpod_health
+    else:
+        from server.redis_client import ping, get_queue_length, active_worker_count
+        redis_ok = await ping()
+        queue_len = await get_queue_length() if redis_ok else -1
+        workers = await active_worker_count() if redis_ok else 0
+        if not redis_ok:
+            result["status"] = "degraded"
+        result["redis"] = redis_ok
+        result["queue_length"] = queue_len
+        result["active_workers"] = workers
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -121,6 +135,16 @@ def transform_to_bytes(ctx):
     return to_translation(ctx).to_bytes()
 
 
+def _ctx_to_response(ctx_or_dict) -> TranslationResponse:
+    """Convert get_ctx result to TranslationResponse regardless of worker mode.
+
+    In Redis mode, ctx is a Context object; in RunPod mode, it's a dict.
+    """
+    if isinstance(ctx_or_dict, dict):
+        return TranslationResponse.model_validate(ctx_or_dict)
+    return to_translation(ctx_or_dict)
+
+
 # ---------------------------------------------------------------------------
 # Translation endpoints (unchanged API contract)
 # ---------------------------------------------------------------------------
@@ -128,16 +152,24 @@ def transform_to_bytes(ctx):
 @app.post("/translate/json", response_model=TranslationResponse, tags=["api", "json"])
 async def json_endpoint(req: Request, data: TranslateRequest):
     ctx = await get_ctx(req, data.config, data.image)
-    return to_translation(ctx)
+    return _ctx_to_response(ctx)
 
 @app.post("/translate/bytes", response_class=StreamingResponse, tags=["api", "json"])
 async def bytes_endpoint(req: Request, data: TranslateRequest):
     ctx = await get_ctx(req, data.config, data.image)
-    return StreamingResponse(content=to_translation(ctx).to_bytes())
+    return StreamingResponse(content=_ctx_to_response(ctx).to_bytes())
 
 @app.post("/translate/image", response_class=StreamingResponse, tags=["api", "json"])
 async def image_endpoint(req: Request, data: TranslateRequest) -> StreamingResponse:
     ctx = await get_ctx(req, data.config, data.image)
+    if isinstance(ctx, dict):
+        # RunPod mode: use rendered_image from response
+        resp = TranslationResponse.model_validate(ctx)
+        if resp.rendered_image:
+            import base64 as b64mod
+            img_data = b64mod.b64decode(resp.rendered_image.split(",", 1)[1])
+            return StreamingResponse(io.BytesIO(img_data), media_type="image/png")
+        raise HTTPException(500, detail="No rendered image in RunPod response")
     img_byte_arr = io.BytesIO()
     ctx.result.save(img_byte_arr, format="PNG")
     img_byte_arr.seek(0)
@@ -165,7 +197,7 @@ async def json_form(req: Request, image: UploadFile = File(...), config: str = F
     img = await image.read()
     conf = Config.parse_raw(config)
     ctx = await get_ctx(req, conf, img)
-    return to_translation(ctx)
+    return _ctx_to_response(ctx)
 
 @app.post("/translate/with-form/bytes", response_class=StreamingResponse, tags=["api", "form"])
 async def bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)):
@@ -174,7 +206,7 @@ async def bytes_form(req: Request, image: UploadFile = File(...), config: str = 
     img = await image.read()
     conf = Config.parse_raw(config)
     ctx = await get_ctx(req, conf, img)
-    return StreamingResponse(content=to_translation(ctx).to_bytes())
+    return StreamingResponse(content=_ctx_to_response(ctx).to_bytes())
 
 @app.post("/translate/with-form/image", response_class=StreamingResponse, tags=["api", "form"])
 async def image_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)) -> StreamingResponse:
@@ -183,6 +215,13 @@ async def image_form(req: Request, image: UploadFile = File(...), config: str = 
     img = await image.read()
     conf = Config.parse_raw(config)
     ctx = await get_ctx(req, conf, img)
+    if isinstance(ctx, dict):
+        resp = TranslationResponse.model_validate(ctx)
+        if resp.rendered_image:
+            import base64 as b64mod
+            img_data = b64mod.b64decode(resp.rendered_image.split(",", 1)[1])
+            return StreamingResponse(io.BytesIO(img_data), media_type="image/png")
+        raise HTTPException(500, detail="No rendered image in RunPod response")
     img_byte_arr = io.BytesIO()
     ctx.result.save(img_byte_arr, format="PNG")
     img_byte_arr.seek(0)
@@ -301,7 +340,7 @@ async def get_result_by_folder(folder_name: str):
 @app.post("/translate/batch/json", response_model=list[TranslationResponse], tags=["api", "json", "batch"])
 async def batch_json(req: Request, data: BatchTranslateRequest):
     results = await get_batch_ctx(req, data.config, data.images, data.batch_size)
-    return [to_translation(ctx) for ctx in results]
+    return [_ctx_to_response(ctx) for ctx in results]
 
 @app.post("/translate/batch/images", tags=["api", "batch"])
 async def batch_images(req: Request, data: BatchTranslateRequest):
@@ -313,7 +352,13 @@ async def batch_images(req: Request, data: BatchTranslateRequest):
     with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
         with zipfile.ZipFile(tmp_file, 'w') as zip_file:
             for i, ctx in enumerate(results):
-                if ctx.result:
+                if isinstance(ctx, dict):
+                    resp = TranslationResponse.model_validate(ctx)
+                    if resp.rendered_image:
+                        import base64 as b64mod
+                        img_data = b64mod.b64decode(resp.rendered_image.split(",", 1)[1])
+                        zip_file.writestr(f"translated_{i+1}.png", img_data)
+                elif ctx.result:
                     img_byte_arr = io.BytesIO()
                     ctx.result.save(img_byte_arr, format="PNG")
                     zip_file.writestr(f"translated_{i+1}.png", img_byte_arr.getvalue())

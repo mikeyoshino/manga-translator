@@ -65,3 +65,4 @@ supabase
 omise
 redis[hiredis]
 sentry-sdk[fastapi]
+runpod

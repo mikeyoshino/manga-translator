@@ -1,9 +1,9 @@
 """
 Request extraction and streaming for the translation API.
 
-Converts incoming images to bytes, enqueues jobs to Redis, and streams
-progress back to the client using the same binary protocol as before
-(1 byte status + 4 byte length + N bytes data).
+Supports dual mode:
+- Redis (default): enqueue to Redis Streams, stream progress via PubSub
+- RunPod: submit to RunPod Serverless, poll for result (no real-time streaming)
 """
 
 import asyncio
@@ -21,8 +21,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from manga_translator.config import Config
-from server.myqueue import task_queue
-from server.redis_client import subscribe_progress
+from server.myqueue import task_queue, WORKER_MODE
 
 
 class TranslateRequest(BaseModel):
@@ -77,8 +76,31 @@ def _image_to_bytes(image: Union[str, bytes, Image.Image]) -> bytes:
     raise ValueError(f"Unsupported image type: {type(image)}")
 
 
+# ---------------------------------------------------------------------------
+# RunPod mode helpers
+# ---------------------------------------------------------------------------
+
+async def _runpod_translate(image_bytes: bytes, config: Config) -> dict:
+    """Submit to RunPod and poll for result. Returns TranslationResponse dict."""
+    from server.runpod_adapter import submit_job, poll_job, image_bytes_to_b64
+
+    image_b64 = image_bytes_to_b64(image_bytes)
+    config_json = config.model_dump_json()
+    job_id = await submit_job(image_b64, config_json)
+    return await poll_job(job_id)
+
+
+# ---------------------------------------------------------------------------
+# Redis mode (original)
+# ---------------------------------------------------------------------------
+
 async def get_ctx(req: Request, config: Config, image: str | bytes):
     """Enqueue job, wait for result, return deserialized Context."""
+    if WORKER_MODE == "runpod":
+        return await _runpod_get_ctx(req, config, image)
+
+    from server.redis_client import subscribe_progress
+
     image_bytes = _image_to_bytes(image)
     config_json = config.model_dump_json()
 
@@ -107,8 +129,27 @@ async def get_ctx(req: Request, config: Config, image: str | bytes):
     return pickle.loads(result_data)
 
 
+async def _runpod_get_ctx(req: Request, config: Config, image: str | bytes):
+    """RunPod mode: submit + poll, return TranslationResponse dict (not Context)."""
+    image_bytes = _image_to_bytes(image)
+    import sentry_sdk
+    sentry_sdk.set_tag("worker_mode", "runpod")
+
+    result = await _runpod_translate(image_bytes, config)
+
+    if "error" in result:
+        raise HTTPException(500, detail=result["error"])
+
+    return result
+
+
 async def while_streaming(req: Request, transform, config: Config, image: bytes | str):
     """Enqueue job and stream progress frames back to the client."""
+    if WORKER_MODE == "runpod":
+        return await _runpod_while_streaming(req, transform, config, image)
+
+    from server.redis_client import subscribe_progress
+
     image_bytes = _image_to_bytes(image)
     config_json = config.model_dump_json()
 
@@ -139,8 +180,46 @@ async def while_streaming(req: Request, transform, config: Config, image: bytes 
     return StreamingResponse(_generate(), media_type="application/octet-stream")
 
 
+async def _runpod_while_streaming(req: Request, transform, config: Config, image: bytes | str):
+    """
+    RunPod mode streaming: emit a "processing" progress frame,
+    poll RunPod for the result, then emit the result frame.
+    """
+    image_bytes = _image_to_bytes(image)
+
+    async def _generate():
+        # Emit a progress frame so the client knows we're working
+        progress_msg = b"Processing on GPU..."
+        yield b'\x01' + len(progress_msg).to_bytes(4, 'big') + progress_msg
+
+        try:
+            result = await _runpod_translate(image_bytes, config)
+
+            if "error" in result:
+                error_msg = result["error"].encode("utf-8")
+                yield b'\x02' + len(error_msg).to_bytes(4, 'big') + error_msg
+                return
+
+            # RunPod returns TranslationResponse dict — encode it as the transform expects
+            from server.to_json import TranslationResponse
+            response = TranslationResponse.model_validate(result)
+            result_bytes = response.model_dump_json().encode("utf-8")
+            yield b'\x00' + len(result_bytes).to_bytes(4, 'big') + result_bytes
+
+        except Exception as e:
+            error_msg = f"RunPod error: {e}".encode("utf-8")
+            yield b'\x02' + len(error_msg).to_bytes(4, 'big') + error_msg
+
+    return StreamingResponse(_generate(), media_type="application/octet-stream")
+
+
 async def get_batch_ctx(req: Request, config: Config, images: list[str | bytes], batch_size: int = 4):
     """Enqueue each image as a separate job, collect all results."""
+    if WORKER_MODE == "runpod":
+        return await _runpod_get_batch_ctx(req, config, images, batch_size)
+
+    from server.redis_client import subscribe_progress
+
     config_json = config.model_dump_json()
     tasks = []
 
@@ -168,3 +247,34 @@ async def get_batch_ctx(req: Request, config: Config, images: list[str | bytes],
         results.append(pickle.loads(result_data))
 
     return results
+
+
+async def _runpod_get_batch_ctx(req: Request, config: Config, images: list[str | bytes], batch_size: int = 4):
+    """RunPod mode: submit all images concurrently, poll for results."""
+    from server.runpod_adapter import submit_job, poll_job, image_bytes_to_b64
+
+    config_json = config.model_dump_json()
+
+    # Submit all jobs
+    job_ids = []
+    for img in images:
+        image_bytes = _image_to_bytes(img)
+        image_b64 = image_bytes_to_b64(image_bytes)
+        job_id = await submit_job(image_b64, config_json)
+        job_ids.append(job_id)
+
+    # Poll all results concurrently
+    results = await asyncio.gather(
+        *[poll_job(jid) for jid in job_ids],
+        return_exceptions=True,
+    )
+
+    validated = []
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            raise HTTPException(500, detail=f"Translation failed for job {job_ids[i]}: {result}")
+        if "error" in result:
+            raise HTTPException(500, detail=result["error"])
+        validated.append(result)
+
+    return validated
