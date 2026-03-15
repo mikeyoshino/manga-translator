@@ -30,7 +30,7 @@ services:
     restart: unless-stopped
 
   api:
-    image: ${API_IMAGE:-ghcr.io/your-org/manga-translator/api:latest}
+    image: ${API_IMAGE:-ghcr.io/mikeyoshino/manga-translator/api:latest}
     expose:
       - "5003"
     ports:
@@ -53,7 +53,7 @@ services:
     restart: unless-stopped
 
   front:
-    image: ${FRONT_IMAGE:-ghcr.io/your-org/manga-translator/front:latest}
+    image: ${FRONT_IMAGE:-ghcr.io/mikeyoshino/manga-translator/front:latest}
     expose:
       - "3000"
     environment:
