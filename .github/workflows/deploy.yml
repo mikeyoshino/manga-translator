@@ -73,6 +73,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  deploy-runpod:
+    name: Deploy RunPod Worker
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger RunPod release
+        run: |
+          RESPONSE=$(curl -s -X POST "https://api.runpod.io/graphql?api_key=${{ secrets.RUNPOD_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "query": "mutation { saveEndpoint(input: { id: \"${{ secrets.RUNPOD_ENDPOINT_ID }}\", imageName: \"${{ env.RUNPOD_IMAGE }}:${{ github.sha }}\" }) { id imageName } }"
+            }')
+          echo "RunPod API response: $RESPONSE"
+          # Fail if response contains errors
+          if echo "$RESPONSE" | grep -q '"errors"'; then
+            echo "ERROR: RunPod API returned errors"
+            exit 1
+          fi
+
   deploy:
     name: Deploy to Contabo VPS
     needs: build-and-push
