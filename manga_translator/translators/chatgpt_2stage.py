@@ -926,7 +926,7 @@ class ChatGPT2StageTranslator(OpenAITranslator):
         response = await self.client.chat.completions.create(
             model=model_to_use,
             messages=messages,
-            max_tokens=self._MAX_TOKENS // 2,
+            max_completion_tokens=self._MAX_TOKENS // 2,
             temperature=self.temperature,
             top_p=self.top_p,
             timeout=self._TIMEOUT

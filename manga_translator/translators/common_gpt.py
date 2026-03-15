@@ -237,7 +237,7 @@ class CommonGPTTranslator(ConfigGPT, CommonTranslator):
         kwargs = {
             "model": self.MODEL,
             "messages": messages,
-            "max_tokens": self._MAX_TOKENS // 2,
+            "max_completion_tokens": self._MAX_TOKENS // 2,
             "temperature": self.temperature,
             "top_p": self.top_p,
             "timeout": self._TIMEOUT
@@ -385,7 +385,7 @@ class _CommonGPTTranslator_JSON:
         kwargs = {
             "model": self.translator.MODEL,
             "messages": messages,
-            "max_tokens": self.translator._MAX_TOKENS,
+            "max_completion_tokens": self.translator._MAX_TOKENS,
             "temperature": self.translator.temperature,
             "top_p": self.translator.top_p,
             "timeout": self.translator._TIMEOUT,
