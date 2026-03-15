@@ -20,7 +20,7 @@ from fastapi import Request, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from manga_translator import Config
+from manga_translator.config import Config
 from server.myqueue import task_queue
 from server.redis_client import subscribe_progress
 
