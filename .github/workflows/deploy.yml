@@ -78,15 +78,14 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger RunPod release
+      - name: Update RunPod template image
         run: |
           RESPONSE=$(curl -s -X POST "https://api.runpod.io/graphql?api_key=${{ secrets.RUNPOD_API_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "query": "mutation { saveEndpoint(input: { id: \"${{ secrets.RUNPOD_ENDPOINT_ID }}\", imageName: \"${{ env.RUNPOD_IMAGE }}:${{ github.sha }}\" }) { id imageName } }"
+              "query": "mutation { saveTemplate(input: { id: \"${{ secrets.RUNPOD_TEMPLATE_ID }}\", imageName: \"${{ env.RUNPOD_IMAGE }}:${{ github.sha }}\" }) { id imageName } }"
             }')
           echo "RunPod API response: $RESPONSE"
-          # Fail if response contains errors
           if echo "$RESPONSE" | grep -q '"errors"'; then
             echo "ERROR: RunPod API returned errors"
             exit 1
