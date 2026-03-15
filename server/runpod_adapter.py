@@ -53,7 +53,7 @@ async def submit_job(image_b64: str, config_json: str) -> str:
         return job_id
 
 
-async def poll_job(job_id: str, timeout: float = 120) -> dict:
+async def poll_job(job_id: str, timeout: float = 600) -> dict:
     """
     Poll RunPod for job completion with exponential backoff.
 
