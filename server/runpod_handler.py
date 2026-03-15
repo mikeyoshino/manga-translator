@@ -34,9 +34,9 @@ translator = MangaTranslator({"use_gpu": True, "verbose": True})
 logger.info("MangaTranslator ready.")
 
 
-def handler(event: dict) -> dict:
+async def handler(event: dict) -> dict:
     """
-    RunPod handler function.
+    RunPod async handler function.
 
     Input:
         event["input"]["image_b64"] — base64-encoded image
@@ -56,7 +56,7 @@ def handler(event: dict) -> dict:
         config = Config.model_validate_json(config_json)
 
         # Run translation
-        ctx = asyncio.run(translator.translate(image=image, config=config))
+        ctx = await translator.translate(image=image, config=config)
 
         # Convert to JSON-serializable response
         response = to_translation(ctx)
