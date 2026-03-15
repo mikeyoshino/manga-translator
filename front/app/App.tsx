@@ -43,6 +43,9 @@ const t = {
     subscription: "แพ็กเกจสมาชิก",
     tokenUsage: "การใช้โทเค็น",
     loading: "กำลังโหลด...",
+    welcomeTitle: "ยินดีต้อนรับ! คุณได้รับ 5 โทเค็นฟรี",
+    welcomeDesc: "แปลมังงะได้ฟรี 5 รูปเลย — สร้างโปรเจกต์แรกของคุณเพื่อเริ่มต้น!",
+    dismiss: "เข้าใจแล้ว",
   },
   en: {
     projects: "Projects",
@@ -64,6 +67,9 @@ const t = {
     subscription: "Subscription",
     tokenUsage: "Token Usage",
     loading: "Loading...",
+    welcomeTitle: "Welcome! You got 5 free tokens",
+    welcomeDesc: "Translate 5 manga images for free — create your first project to get started!",
+    dismiss: "Got it",
   },
 } as const;
 
@@ -73,6 +79,15 @@ export const App: React.FC = () => {
 
   const [locale, setLocale] = useState<Locale>(() => (localStorage.getItem("manga-translator-locale") as Locale) || "th");
   const i = t[locale];
+
+  const [showWelcome, setShowWelcome] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return !localStorage.getItem("manga-translator-welcome-dismissed");
+  });
+  const dismissWelcome = () => {
+    setShowWelcome(false);
+    localStorage.setItem("manga-translator-welcome-dismissed", "1");
+  };
 
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -222,7 +237,7 @@ export const App: React.FC = () => {
                   {isAdmin && <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded mt-1 inline-block">Admin</span>}
                 </div>
                 <div className="py-1">
-                  <button onClick={() => { setProfileOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                  <button onClick={() => { setProfileOpen(false); navigate("/profile"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                     <User className="w-4 h-4 text-slate-400" /> {i.profile}
                   </button>
                   <button onClick={() => { setProfileOpen(false); navigate("/topup"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
@@ -249,6 +264,21 @@ export const App: React.FC = () => {
       {/* Main Content — Project List */}
       <main className="flex-1 overflow-y-auto p-6">
         <div className="max-w-5xl mx-auto">
+          {/* Welcome banner for new users */}
+          {showWelcome && !isAdmin && (
+            <div className="mb-6 bg-gradient-to-r from-indigo-50 to-emerald-50 border border-indigo-200 rounded-2xl p-5 flex items-start gap-4">
+              <div className="bg-emerald-100 w-10 h-10 rounded-xl flex items-center justify-center shrink-0">
+                <Coins className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-slate-800">{i.welcomeTitle}</h3>
+                <p className="text-xs text-slate-500 mt-1">{i.welcomeDesc}</p>
+              </div>
+              <button onClick={dismissWelcome} className="p-1 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           <div className="flex items-end justify-between mb-6">
             <div>
               <h2 className="text-2xl font-bold text-slate-800">{i.projects}</h2>

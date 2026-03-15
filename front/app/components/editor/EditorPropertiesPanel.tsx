@@ -2,7 +2,162 @@ import { useEditor } from "@/context/EditorContext";
 import { availableFonts } from "@/utils/fontMap";
 import { getEditorLocale, editorT } from "@/utils/editorI18n";
 
-export function EditorPropertiesPanel() {
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <span className="relative group ml-1 inline-flex">
+      <svg
+        className="w-3.5 h-3.5 text-slate-400 cursor-help"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+      >
+        <path
+          fillRule="evenodd"
+          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
+          clipRule="evenodd"
+        />
+      </svg>
+      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block bg-slate-800 text-white text-[11px] rounded-lg px-2.5 py-1.5 whitespace-normal w-48 z-50 pointer-events-none shadow-lg">
+        {text}
+      </span>
+    </span>
+  );
+}
+
+const PRESET_COLORS = [
+  "#000000", "#ffffff", "#ef4444", "#3b82f6",
+  "#22c55e", "#eab308", "#f97316", "#ec4899",
+];
+
+function DrawingToolsPanel() {
+  const {
+    activeTool, penColor, setPenColor, penSize, setPenSize,
+    currentImage, drawingLines, undoDrawingLine, clearDrawingLines,
+  } = useEditor();
+  const locale = getEditorLocale();
+  const i = editorT[locale];
+
+  const currentLines = currentImage ? (drawingLines.get(currentImage.id) || []) : [];
+
+  if (activeTool === "eraser") {
+    return (
+      <div className="w-64 bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
+        <h3 className="text-sm font-bold mb-3 text-slate-700">{i.drawingTools}</h3>
+
+        <label className="block text-xs font-semibold text-slate-500 mb-1">{i.eraserSize}</label>
+        <div className="flex items-center gap-2 mb-3">
+          <input
+            type="range"
+            min={5}
+            max={50}
+            value={penSize}
+            onChange={(e) => setPenSize(Number(e.target.value))}
+            className="flex-1"
+          />
+          <span className="text-xs text-slate-600 w-8 text-right">{penSize}px</span>
+        </div>
+
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={() => currentImage && undoDrawingLine(currentImage.id)}
+            disabled={currentLines.length === 0}
+            className="flex-1 py-1.5 text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40 rounded-lg transition-colors"
+          >
+            {i.undo}
+          </button>
+          <button
+            onClick={() => {
+              if (currentImage && confirm(i.confirmClearDrawing)) {
+                clearDrawingLines(currentImage.id);
+              }
+            }}
+            disabled={currentLines.length === 0}
+            className="flex-1 py-1.5 text-xs font-semibold bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 disabled:opacity-40 rounded-lg transition-colors"
+          >
+            {i.clearDrawing}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Pen mode
+  return (
+    <div className="w-64 bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
+      <h3 className="text-sm font-bold mb-3 text-slate-700">{i.drawingTools}</h3>
+
+      {/* Color picker */}
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.color}</label>
+      <div className="flex gap-2 mb-3">
+        <input
+          type="color"
+          value={penColor}
+          onChange={(e) => setPenColor(e.target.value)}
+          className="w-10 h-8 rounded-lg cursor-pointer bg-transparent border border-slate-200"
+        />
+        <input
+          type="text"
+          value={penColor}
+          onChange={(e) => setPenColor(e.target.value)}
+          className="flex-1 bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+        />
+      </div>
+
+      {/* Preset colors */}
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.presetColors}</label>
+      <div className="flex gap-1.5 mb-3 flex-wrap">
+        {PRESET_COLORS.map((c) => (
+          <button
+            key={c}
+            onClick={() => setPenColor(c)}
+            className={`w-6 h-6 rounded-md border-2 transition-colors ${
+              penColor === c ? "border-indigo-500" : "border-slate-200"
+            }`}
+            style={{ backgroundColor: c }}
+            title={c}
+          />
+        ))}
+      </div>
+
+      {/* Brush size */}
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.brushSize}</label>
+      <div className="flex items-center gap-2 mb-3">
+        <input
+          type="range"
+          min={1}
+          max={20}
+          value={penSize}
+          onChange={(e) => setPenSize(Number(e.target.value))}
+          className="flex-1"
+        />
+        <span className="text-xs text-slate-600 w-8 text-right">{penSize}px</span>
+      </div>
+
+      {/* Undo / Clear */}
+      <div className="flex gap-2 mt-4">
+        <button
+          onClick={() => currentImage && undoDrawingLine(currentImage.id)}
+          disabled={currentLines.length === 0}
+          className="flex-1 py-1.5 text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40 rounded-lg transition-colors"
+        >
+          {i.undo}
+        </button>
+        <button
+          onClick={() => {
+            if (currentImage && confirm(i.confirmClearDrawing)) {
+              clearDrawingLines(currentImage.id);
+            }
+          }}
+          disabled={currentLines.length === 0}
+          className="flex-1 py-1.5 text-xs font-semibold bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 disabled:opacity-40 rounded-lg transition-colors"
+        >
+          {i.clearDrawing}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function BlockPropertiesPanel() {
   const { currentImage, selectedBlockId, updateBlock } = useEditor();
   const locale = getEditorLocale();
   const i = editorT[locale];
@@ -50,7 +205,7 @@ export function EditorPropertiesPanel() {
       />
 
       {/* Font family */}
-      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.font}</label>
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.font} <InfoTooltip text={i.hintFont} /></label>
       <select
         value={block.editedFontFamily}
         onChange={(e) => update({ editedFontFamily: e.target.value })}
@@ -64,7 +219,7 @@ export function EditorPropertiesPanel() {
       </select>
 
       {/* Font size */}
-      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.fontSize}</label>
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.fontSize} <InfoTooltip text={i.hintFontSize} /></label>
       <input
         type="number"
         value={block.editedFontSize}
@@ -75,7 +230,7 @@ export function EditorPropertiesPanel() {
       />
 
       {/* Color */}
-      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.color}</label>
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.color} <InfoTooltip text={i.hintColor} /></label>
       <div className="flex gap-2 mb-3">
         <input
           type="color"
@@ -92,7 +247,7 @@ export function EditorPropertiesPanel() {
       </div>
 
       {/* Alignment */}
-      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.alignment}</label>
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.alignment} <InfoTooltip text={i.hintAlignment} /></label>
       <div className="flex gap-1 mb-3">
         {([
           ["left", i.left],
@@ -114,7 +269,7 @@ export function EditorPropertiesPanel() {
       </div>
 
       {/* Bold / Italic */}
-      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.style}</label>
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.style} <InfoTooltip text={i.hintStyle} /></label>
       <div className="flex gap-1 mb-3">
         <button
           onClick={() => update({ editedBold: !block.editedBold })}
@@ -139,7 +294,7 @@ export function EditorPropertiesPanel() {
       </div>
 
       {/* Text border / stroke */}
-      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.textBorder}</label>
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.textBorder} <InfoTooltip text={i.hintTextBorder} /></label>
       <div className="flex items-center gap-2 mb-2">
         <button
           onClick={() => update({ editedStrokeEnabled: !block.editedStrokeEnabled })}
@@ -174,7 +329,7 @@ export function EditorPropertiesPanel() {
       </div>
 
       {/* Letter spacing */}
-      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.letterSpacing}</label>
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.letterSpacing} <InfoTooltip text={i.hintLetterSpacing} /></label>
       <input
         type="number"
         value={block.editedLetterSpacing}
@@ -184,7 +339,7 @@ export function EditorPropertiesPanel() {
       />
 
       {/* Line spacing */}
-      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.lineSpacing}</label>
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.lineSpacing} <InfoTooltip text={i.hintLineSpacing} /></label>
       <input
         type="number"
         value={block.editedLineSpacing}
@@ -196,7 +351,7 @@ export function EditorPropertiesPanel() {
       />
 
       {/* Position */}
-      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.position}</label>
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.position} <InfoTooltip text={i.hintPosition} /></label>
       <div className="flex gap-2 mb-3">
         <div className="flex-1">
           <span className="text-[10px] text-slate-400">X</span>
@@ -219,7 +374,7 @@ export function EditorPropertiesPanel() {
       </div>
 
       {/* Size */}
-      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.size}</label>
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.size} <InfoTooltip text={i.hintSize} /></label>
       <div className="flex gap-2 mb-3">
         <div className="flex-1">
           <span className="text-[10px] text-slate-400">W</span>
@@ -276,4 +431,99 @@ export function EditorPropertiesPanel() {
       </div>
     </div>
   );
+}
+
+function MagicRemoverPanel() {
+  const {
+    currentImage, magicRemoverLines, magicRemoverSize, setMagicRemoverSize,
+    undoMagicRemoverLine, clearMagicRemoverLines,
+    isInpainting, applyMagicRemover, undoMagicRemover, imageHistory,
+  } = useEditor();
+  const locale = getEditorLocale();
+  const i = editorT[locale];
+
+  const currentLines = currentImage ? (magicRemoverLines.get(currentImage.id) || []) : [];
+  const historyStack = currentImage ? (imageHistory.get(currentImage.id) || []) : [];
+
+  return (
+    <div className="w-64 bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
+      <h3 className="text-sm font-bold mb-3 text-fuchsia-700">{i.magicRemover}</h3>
+
+      {/* Brush size */}
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.brushSize}</label>
+      <div className="flex items-center gap-2 mb-3">
+        <input
+          type="range"
+          min={5}
+          max={100}
+          value={magicRemoverSize}
+          onChange={(e) => setMagicRemoverSize(Number(e.target.value))}
+          className="flex-1"
+        />
+        <span className="text-xs text-slate-600 w-8 text-right">{magicRemoverSize}px</span>
+      </div>
+
+      {/* Undo stroke / Clear all */}
+      <div className="flex gap-2 mb-3">
+        <button
+          onClick={() => currentImage && undoMagicRemoverLine(currentImage.id)}
+          disabled={currentLines.length === 0}
+          className="flex-1 py-1.5 text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40 rounded-lg transition-colors"
+        >
+          {i.undo}
+        </button>
+        <button
+          onClick={() => currentImage && clearMagicRemoverLines(currentImage.id)}
+          disabled={currentLines.length === 0}
+          className="flex-1 py-1.5 text-xs font-semibold bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 disabled:opacity-40 rounded-lg transition-colors"
+        >
+          {i.clearMask}
+        </button>
+      </div>
+
+      {/* Apply button */}
+      <button
+        onClick={() => currentImage && applyMagicRemover(currentImage.id)}
+        disabled={isInpainting || currentLines.length === 0}
+        className="w-full py-2 text-sm font-bold text-white bg-fuchsia-600 hover:bg-fuchsia-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-2"
+      >
+        {isInpainting ? (
+          <>
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            {i.removing}
+          </>
+        ) : (
+          i.applyRemoval
+        )}
+      </button>
+
+      {/* Undo removal */}
+      {historyStack.length > 0 && (
+        <button
+          onClick={() => currentImage && undoMagicRemover(currentImage.id)}
+          disabled={isInpainting}
+          className="w-full mt-2 py-1.5 text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40 rounded-lg transition-colors"
+        >
+          {i.undoRemoval}
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function EditorPropertiesPanel() {
+  const { activeTool } = useEditor();
+
+  if (activeTool === "magicRemover") {
+    return <MagicRemoverPanel />;
+  }
+
+  if (activeTool === "pen" || activeTool === "eraser") {
+    return <DrawingToolsPanel />;
+  }
+
+  return <BlockPropertiesPanel />;
 }

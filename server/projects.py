@@ -206,8 +206,8 @@ def delete_project(project_id: str, user_id: str):
             if files:
                 paths = [f"{base}/{folder}/{f['name']}" for f in files]
                 storage.remove(paths)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to cleanup storage folder %s/%s: %s", base, folder, e)
     client.table("projects").delete().eq("id", project_id).eq("user_id", user_id).execute()
 
 
@@ -222,15 +222,28 @@ def delete_image(image_id: str, user_id: str):
         if img.data.get(path_field):
             try:
                 storage.remove([img.data[path_field]])
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to delete storage file %s: %s", img.data[path_field], e)
+    # Delete background files via metadata (fast path)
     if img.data.get("translation_metadata"):
         for t in img.data["translation_metadata"].get("translations", []):
             if t.get("background_path"):
                 try:
                     storage.remove([t["background_path"]])
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Failed to delete background file %s: %s", t["background_path"], e)
+    # Fallback: list backgrounds folder and remove any remaining files for this image
+    project_id = img.data["project_id"]
+    base = _base_path(user_id, project_id)
+    try:
+        bg_files = storage.list(f"{base}/backgrounds")
+        if bg_files:
+            orphaned = [f"{base}/backgrounds/{f['name']}" for f in bg_files
+                        if f["name"].startswith(f"{image_id}_block_")]
+            if orphaned:
+                storage.remove(orphaned)
+    except Exception as e:
+        logger.warning("Failed to cleanup background files for image %s: %s", image_id, e)
     client.table("project_images").delete().eq("id", image_id).execute()
 
 

@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 
 # Token packages: tokens → satangs (1 THB = 100 satangs)
 TOKEN_PACKAGES: dict[int, int] = {
-    50: 2900,      # 50 tokens → 29 THB
-    200: 9900,     # 200 tokens → 99 THB
-    500: 19900,    # 500 tokens → 199 THB
+    50: 9900,      # 50 tokens → 99 THB
+    200: 29900,    # 200 tokens → 299 THB
+    500: 59900,    # 500 tokens → 599 THB
 }
 
 

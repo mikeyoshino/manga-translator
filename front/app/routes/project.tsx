@@ -16,6 +16,12 @@ import {
   Layers,
   AlertCircle,
   ExternalLink,
+  User,
+  Coins,
+  ChevronDown,
+  CreditCard,
+  BarChart3,
+  LogOut,
 } from "lucide-react";
 import {
   type StatusKey,
@@ -89,6 +95,21 @@ const t = {
     vertical: "แนวตั้ง",
     uploading: "กำลังอัปโหลด...",
     images: "รูป",
+    tokens: "โทเค็น",
+    adminUnlimited: "ผู้ดูแล (ไม่จำกัด)",
+    profile: "โปรไฟล์",
+    subscription: "แพ็กเกจสมาชิก",
+    tokenUsage: "การใช้โทเค็น",
+    signOut: "ออกจากระบบ",
+    hintTextDetector: "โมเดลที่ใช้ตรวจจับตำแหน่งข้อความในภาพ",
+    hintResolution: "ความละเอียดที่ใช้ตรวจจับ ยิ่งสูงยิ่งแม่นแต่ช้าลง",
+    hintTargetLang: "ภาษาที่ต้องการแปลเป็น",
+    hintRenderDir: "ทิศทางการเรนเดอร์ข้อความแปล: อัตโนมัติ, แนวนอน หรือ แนวตั้ง",
+    hintBoxThreshold: "ค่าขีดจำกัดความมั่นใจในการตรวจจับกล่องข้อความ ยิ่งสูงยิ่งเข้มงวด",
+    hintUnclipRatio: "อัตราขยายกล่องข้อความ ค่าสูงจะได้กล่องใหญ่ขึ้น",
+    hintMaskDilation: "ขยายมาสก์ลบข้อความ ค่าสูงจะลบพื้นที่รอบข้อความมากขึ้น",
+    hintInpainter: "โมเดลที่ใช้ลบข้อความต้นฉบับออกจากภาพ",
+    hintInpaintingSize: "ความละเอียดที่ใช้ในการลบข้อความ",
   },
   en: {
     back: "Back",
@@ -125,8 +146,44 @@ const t = {
     vertical: "Vertical",
     uploading: "Uploading...",
     images: "images",
+    tokens: "Tokens",
+    adminUnlimited: "Admin (Unlimited)",
+    profile: "Profile",
+    subscription: "Subscription",
+    tokenUsage: "Token Usage",
+    signOut: "Sign out",
+    hintTextDetector: "Model used to detect text regions in the image",
+    hintResolution: "Detection resolution — higher is more accurate but slower",
+    hintTargetLang: "Language to translate into",
+    hintRenderDir: "Text render direction: auto, horizontal, or vertical",
+    hintBoxThreshold: "Confidence threshold for text box detection — higher is stricter",
+    hintUnclipRatio: "Text box expansion ratio — higher gives larger boxes",
+    hintMaskDilation: "Mask dilation around text — higher removes more surrounding area",
+    hintInpainter: "Model used to remove original text from the image",
+    hintInpaintingSize: "Resolution used for text removal inpainting",
   },
 } as const;
+
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <span className="relative group/tip ml-1 inline-flex">
+      <svg
+        className="w-3.5 h-3.5 text-slate-400 cursor-help"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+      >
+        <path
+          fillRule="evenodd"
+          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
+          clipRule="evenodd"
+        />
+      </svg>
+      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/tip:block bg-slate-800 text-white text-[11px] rounded-lg px-2.5 py-1.5 whitespace-normal w-48 z-50 pointer-events-none shadow-lg">
+        {text}
+      </span>
+    </span>
+  );
+}
 
 const STATUS_PROGRESS: Record<string, number> = {
   pending: 5, detection: 20, ocr: 35, textline_merge: 45,
@@ -564,9 +621,9 @@ function ProjectContent() {
                 <span className="text-[11px] font-bold text-slate-400 uppercase">{i.detection}</span>
               </div>
               <SidebarSelect label={i.textDetector} value={textDetector} onChange={setTextDetector}
-                options={textDetectorOptions.map((o) => ({ value: o.value, label: o.label }))} />
+                options={textDetectorOptions.map((o) => ({ value: o.value, label: o.label }))} hint={i.hintTextDetector} />
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-600">{i.resolution}</label>
+                <label className="text-xs font-semibold text-slate-600">{i.resolution}<InfoTooltip text={i.hintResolution} /></label>
                 <div className="relative">
                   <select className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm pl-8 text-slate-900"
                     value={detectionResolution} onChange={(e) => setDetectionResolution(e.target.value)}>
@@ -589,9 +646,9 @@ function ProjectContent() {
                   { value: "JPN", label: locale === "th" ? "ญี่ปุ่น" : "Japanese" },
                   { value: "CHS", label: locale === "th" ? "จีน (ตัวย่อ)" : "Chinese (Simplified)" },
                   { value: "KOR", label: locale === "th" ? "เกาหลี" : "Korean" },
-                ]} />
+                ]} hint={i.hintTargetLang} />
               <SidebarSelect label={i.renderDir} value={renderTextDirection} onChange={setRenderTextDirection}
-                options={[{ value: "auto", label: i.auto }, { value: "horizontal", label: i.horizontal }, { value: "vertical", label: i.vertical }]} />
+                options={[{ value: "auto", label: i.auto }, { value: "horizontal", label: i.horizontal }, { value: "vertical", label: i.vertical }]} hint={i.hintRenderDir} />
             </div>
             {/* Visuals */}
             <div className="space-y-4">
@@ -599,13 +656,13 @@ function ProjectContent() {
                 <Layers className="w-3.5 h-3.5 text-indigo-500" />
                 <span className="text-[11px] font-bold text-slate-400 uppercase">{i.visuals}</span>
               </div>
-              <SliderInput label={i.boxThreshold} value={customBoxThreshold} min={0} max={1} step={0.01} onChange={setCustomBoxThreshold} />
-              <SliderInput label={i.unclipRatio} value={customUnclipRatio} min={0} max={5} step={0.01} onChange={setCustomUnclipRatio} />
-              <SliderInput label={i.maskDilation} value={maskDilationOffset} min={0} max={100} step={1} onChange={setMaskDilationOffset} />
+              <SliderInput label={i.boxThreshold} value={customBoxThreshold} min={0} max={1} step={0.01} onChange={setCustomBoxThreshold} hint={i.hintBoxThreshold} />
+              <SliderInput label={i.unclipRatio} value={customUnclipRatio} min={0} max={5} step={0.01} onChange={setCustomUnclipRatio} hint={i.hintUnclipRatio} />
+              <SliderInput label={i.maskDilation} value={maskDilationOffset} min={0} max={100} step={1} onChange={setMaskDilationOffset} hint={i.hintMaskDilation} />
               <SidebarSelect label={i.inpainter} value={inpainter} onChange={setInpainter}
-                options={inpainterOptions.map((o) => ({ value: o.value, label: o.label }))} />
+                options={inpainterOptions.map((o) => ({ value: o.value, label: o.label }))} hint={i.hintInpainter} />
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-600">{i.inpaintingSize}</label>
+                <label className="text-xs font-semibold text-slate-600">{i.inpaintingSize}<InfoTooltip text={i.hintInpaintingSize} /></label>
                 <select className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900"
                   value={inpaintingSize} onChange={(e) => setInpaintingSize(e.target.value)}>
                   {inpaintingSizes.map((s) => <option key={s} value={String(s)}>{s}px</option>)}
@@ -636,13 +693,13 @@ function ProjectContent() {
   );
 }
 
-function SidebarSelect({ label, value, onChange, options }: {
+function SidebarSelect({ label, value, onChange, options, hint }: {
   label: string; value: string; onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string }[]; hint?: string;
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-xs font-semibold text-slate-600">{label}</label>
+      <label className="text-xs font-semibold text-slate-600">{label}{hint && <InfoTooltip text={hint} />}</label>
       <select
         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none text-slate-900"
         value={value} onChange={(e) => onChange(e.target.value)}
@@ -653,14 +710,14 @@ function SidebarSelect({ label, value, onChange, options }: {
   );
 }
 
-function SliderInput({ label, value, min, max, step, onChange }: {
+function SliderInput({ label, value, min, max, step, onChange, hint }: {
   label: string; value: number; min: number; max: number; step: number;
-  onChange: (v: number) => void;
+  onChange: (v: number) => void; hint?: string;
 }) {
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-center">
-        <label className="text-xs font-semibold text-slate-600">{label}</label>
+        <label className="text-xs font-semibold text-slate-600">{label}{hint && <InfoTooltip text={hint} />}</label>
         <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 rounded">{value}</span>
       </div>
       <input
@@ -674,8 +731,24 @@ function SliderInput({ label, value, min, max, step, onChange }: {
 
 export default function ProjectPage() {
   const navigate = useNavigate();
+  const { user, tokenBalance, isAdmin, signOut } = useAuth();
   const locale = (typeof window !== "undefined" ? localStorage.getItem("manga-translator-locale") as Locale : null) || "th";
   const i = t[locale];
+
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
+  };
 
   return (
     <AuthGuard>
@@ -692,6 +765,61 @@ export default function ProjectPage() {
               <BookOpen className="text-white w-5 h-5" />
             </div>
             <h1 className="text-lg font-bold tracking-tight text-slate-800">Manga Translator</h1>
+          </div>
+          <div className="ml-auto flex items-center gap-4">
+            {isAdmin ? (
+              <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-100 rounded-full">
+                <Coins className="w-3.5 h-3.5 text-amber-600" />
+                <span className="text-xs font-semibold text-amber-700">{i.adminUnlimited}</span>
+              </div>
+            ) : (
+              <button
+                onClick={() => navigate("/topup")}
+                className="flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full hover:bg-emerald-100 transition-colors"
+              >
+                <Coins className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-xs font-semibold text-emerald-700">{tokenBalance} {i.tokens}</span>
+              </button>
+            )}
+            <div className="h-6 w-px bg-slate-200" />
+            <div ref={profileRef} className="relative">
+              <button
+                onClick={() => setProfileOpen((v) => !v)}
+                className="flex items-center gap-1.5 p-1 hover:bg-slate-100 rounded-full transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                  <User className="w-4 h-4 text-indigo-600" />
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${profileOpen ? "rotate-180" : ""}`} />
+              </button>
+              {profileOpen && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg py-2 z-50">
+                  <div className="px-4 py-2 border-b border-slate-100">
+                    <p className="text-sm font-semibold text-slate-700 truncate">{user?.email}</p>
+                    {isAdmin && <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded mt-1 inline-block">Admin</span>}
+                  </div>
+                  <div className="py-1">
+                    <button onClick={() => { setProfileOpen(false); navigate("/profile"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                      <User className="w-4 h-4 text-slate-400" /> {i.profile}
+                    </button>
+                    <button onClick={() => { setProfileOpen(false); navigate("/topup"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                      <CreditCard className="w-4 h-4 text-slate-400" /> {i.subscription}
+                    </button>
+                    <button onClick={() => { setProfileOpen(false); navigate("/token-usage"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                      <BarChart3 className="w-4 h-4 text-slate-400" /> {i.tokenUsage}
+                      <span className="ml-auto text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                        {isAdmin ? "\u221e" : tokenBalance}
+                      </span>
+                    </button>
+                  </div>
+                  <div className="border-t border-slate-100 py-1">
+                    <button onClick={() => { setProfileOpen(false); handleSignOut(); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors">
+                      <LogOut className="w-4 h-4" /> {i.signOut}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
         <ProjectContent />

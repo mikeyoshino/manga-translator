@@ -120,9 +120,9 @@ const t = {
 } as const;
 
 const PACKAGES = [
-  { tokens: 50, price: 29, key: "starter" as const, icon: Sparkles, highlight: false },
-  { tokens: 200, price: 99, key: "popular" as const, icon: Zap, highlight: true },
-  { tokens: 500, price: 199, key: "bestValue" as const, icon: Crown, highlight: false },
+  { tokens: 50, price: 99, key: "starter" as const, icon: Sparkles, highlight: false },
+  { tokens: 200, price: 299, key: "popular" as const, icon: Zap, highlight: true },
+  { tokens: 500, price: 599, key: "bestValue" as const, icon: Crown, highlight: false },
 ];
 
 // Declare Omise.js global

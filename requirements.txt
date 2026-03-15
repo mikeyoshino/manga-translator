@@ -63,3 +63,5 @@ rusty-manga-image-translator
 python-bidi
 supabase
 omise
+redis[hiredis]
+sentry-sdk[fastapi]

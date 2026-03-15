@@ -2,12 +2,16 @@ import { useEditor } from "@/context/EditorContext";
 import { useNavigate } from "react-router";
 import { exportSingleImage, exportAllAsZip } from "@/utils/exportZip";
 import { useCallback } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, FolderArchive } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, FolderArchive, Pencil, Eraser, Undo2, Sparkles } from "lucide-react";
 import { getEditorLocale, editorT } from "@/utils/editorI18n";
 
 export function EditorToolbar() {
-  const { images, currentImageIndex, setCurrentImageIndex, currentImage, setSelectedBlockId } =
-    useEditor();
+  const {
+    images, currentImageIndex, setCurrentImageIndex, currentImage,
+    setSelectedBlockId, activeTool, setActiveTool,
+    drawingLines, undoDrawingLine,
+    magicRemoverLines, undoMagicRemoverLine,
+  } = useEditor();
   const navigate = useNavigate();
   const locale = getEditorLocale();
   const i = editorT[locale];
@@ -36,6 +40,14 @@ export function EditorToolbar() {
       document.querySelector(".konva-stage canvas") as HTMLCanvasElement | null;
     exportAllAsZip(getter, images);
   }, [images]);
+
+  const handleToolClick = (tool: "pen" | "eraser" | "magicRemover") => {
+    setActiveTool(activeTool === tool ? "select" : tool);
+  };
+
+  const currentLines = currentImage ? (drawingLines.get(currentImage.id) || []) : [];
+  const currentMagicLines = currentImage ? (magicRemoverLines.get(currentImage.id) || []) : [];
+  const isDrawing = activeTool === "pen" || activeTool === "eraser" || activeTool === "magicRemover";
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 bg-white border-b border-slate-200 shrink-0">
@@ -71,6 +83,56 @@ export function EditorToolbar() {
           {currentImage.originalFilename}
         </span>
       )}
+
+      {/* Drawing tools */}
+      <div className="flex items-center gap-1 ml-4 border-l border-slate-200 pl-4">
+        <button
+          onClick={() => handleToolClick("pen")}
+          title={i.pen}
+          className={`p-1.5 rounded-lg transition-colors ${
+            activeTool === "pen"
+              ? "bg-indigo-600 text-white"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <Pencil className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => handleToolClick("eraser")}
+          title={i.eraser}
+          className={`p-1.5 rounded-lg transition-colors ${
+            activeTool === "eraser"
+              ? "bg-indigo-600 text-white"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <Eraser className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => handleToolClick("magicRemover")}
+          title={i.magicRemover}
+          className={`p-1.5 rounded-lg transition-colors ${
+            activeTool === "magicRemover"
+              ? "bg-fuchsia-600 text-white"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <Sparkles className="w-4 h-4" />
+        </button>
+        {isDrawing && (activeTool === "magicRemover" ? currentMagicLines.length > 0 : currentLines.length > 0) && (
+          <button
+            onClick={() => {
+              if (!currentImage) return;
+              if (activeTool === "magicRemover") undoMagicRemoverLine(currentImage.id);
+              else undoDrawingLine(currentImage.id);
+            }}
+            title={i.undo}
+            className="p-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
+          >
+            <Undo2 className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
       <div className="ml-auto flex items-center gap-2">
         <button

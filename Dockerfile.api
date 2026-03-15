@@ -1,0 +1,15 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install only the API server dependencies (no PyTorch, no ML models)
+COPY requirements-api.txt /app/requirements-api.txt
+RUN pip install --no-cache-dir -r /app/requirements-api.txt
+
+COPY . /app
+
+ENV PYTHONPATH="/app"
+
+EXPOSE 5003
+
+CMD ["uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "5003"]

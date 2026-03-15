@@ -1,13 +1,13 @@
 import { useRef, useEffect, useState, useCallback } from "react";
-import { Stage, Layer, Image as KonvaImage } from "react-konva";
+import { Stage, Layer, Image as KonvaImage, Line } from "react-konva";
 import { useEditor } from "@/context/EditorContext";
 import { BlockOverlay } from "./BlockOverlay";
+import type { DrawingLine } from "@/context/EditorContext";
 
 interface InlineEdit {
   blockId: string;
   imageId: string;
   text: string;
-  // Screen position & size for the textarea overlay
   left: number;
   top: number;
   width: number;
@@ -24,6 +24,14 @@ export function EditorCanvas() {
     selectedBlockId,
     setSelectedBlockId,
     updateBlock,
+    activeTool,
+    drawingLines,
+    addDrawingLine,
+    penColor,
+    penSize,
+    magicRemoverLines,
+    addMagicRemoverLine,
+    magicRemoverSize,
   } = useEditor();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -34,7 +42,13 @@ export function EditorCanvas() {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [inlineEdit, setInlineEdit] = useState<InlineEdit | null>(null);
 
-  // Load original image as base (text outside blocks stays visible)
+  // Drawing state
+  const isDrawingRef = useRef(false);
+  const [currentLine, setCurrentLine] = useState<DrawingLine | null>(null);
+
+  const isDrawingTool = activeTool === "pen" || activeTool === "eraser" || activeTool === "magicRemover";
+
+  // Load original image as base
   useEffect(() => {
     const src = currentImage?.originalFile
       ? URL.createObjectURL(currentImage.originalFile)
@@ -91,7 +105,7 @@ export function EditorCanvas() {
     }
   }, [selectedBlockId]);
 
-  // Zoom with wheel — use native listener to avoid passive event issue
+  // Zoom with wheel
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -118,13 +132,71 @@ export function EditorCanvas() {
 
   const handleStageClick = useCallback(
     (e: any) => {
+      if (isDrawingTool) return;
       if (e.target === e.target.getStage() || e.target.getClassName() === "Image") {
         setSelectedBlockId(null);
         if (inlineEdit) commitInlineEdit();
       }
     },
-    [setSelectedBlockId, inlineEdit, commitInlineEdit]
+    [setSelectedBlockId, inlineEdit, commitInlineEdit, isDrawingTool]
   );
+
+  // Convert screen coords to image coords
+  const getImageCoords = useCallback(() => {
+    const stage = stageRef.current;
+    if (!stage) return null;
+    const pos = stage.getPointerPosition();
+    if (!pos) return null;
+    return {
+      x: (pos.x - position.x) / scale,
+      y: (pos.y - position.y) / scale,
+    };
+  }, [position, scale]);
+
+  // Drawing handlers
+  const handleDrawStart = useCallback(() => {
+    if (!isDrawingTool || !currentImage) return;
+    const coords = getImageCoords();
+    if (!coords) return;
+    isDrawingRef.current = true;
+    if (activeTool === "magicRemover") {
+      setCurrentLine({
+        points: [coords.x, coords.y],
+        color: "#ff3388",
+        size: magicRemoverSize,
+        tool: "pen",
+      });
+    } else {
+      setCurrentLine({
+        points: [coords.x, coords.y],
+        color: penColor,
+        size: penSize,
+        tool: activeTool as "pen" | "eraser",
+      });
+    }
+  }, [isDrawingTool, currentImage, getImageCoords, penColor, penSize, magicRemoverSize, activeTool]);
+
+  const handleDrawMove = useCallback(() => {
+    if (!isDrawingRef.current || !currentLine) return;
+    const coords = getImageCoords();
+    if (!coords) return;
+    setCurrentLine((prev) =>
+      prev ? { ...prev, points: [...prev.points, coords.x, coords.y] } : null
+    );
+  }, [currentLine, getImageCoords]);
+
+  const handleDrawEnd = useCallback(() => {
+    if (!isDrawingRef.current || !currentLine || !currentImage) return;
+    isDrawingRef.current = false;
+    if (currentLine.points.length >= 2) {
+      if (activeTool === "magicRemover") {
+        addMagicRemoverLine(currentImage.id, currentLine);
+      } else {
+        addDrawingLine(currentImage.id, currentLine);
+      }
+    }
+    setCurrentLine(null);
+  }, [currentLine, currentImage, addDrawingLine, addMagicRemoverLine, activeTool]);
 
   // Double-click a block to start inline editing
   const handleBlockDblClick = useCallback(
@@ -133,7 +205,6 @@ export function EditorCanvas() {
       const block = currentImage.editableBlocks.find((b) => b.id === blockId);
       if (!block) return;
 
-      // Calculate screen position of the block
       const screenX = block.editedX * scale + position.x;
       const screenY = block.editedY * scale + position.y;
       const screenW = block.editedWidth * scale;
@@ -158,10 +229,14 @@ export function EditorCanvas() {
 
   if (!currentImage) return null;
 
+  const existingLines = drawingLines.get(currentImage.id) || [];
+  const existingMagicLines = magicRemoverLines.get(currentImage.id) || [];
+
   return (
     <div
       ref={containerRef}
       className="w-full h-full bg-gray-950 overflow-hidden konva-stage relative"
+      style={{ cursor: isDrawingTool ? "crosshair" : undefined }}
     >
       <Stage
         ref={stageRef}
@@ -171,7 +246,7 @@ export function EditorCanvas() {
         scaleY={scale}
         x={position.x}
         y={position.y}
-        draggable
+        draggable={!isDrawingTool}
         onDragEnd={(e) => {
           if (e.target === e.target.getStage()) {
             setPosition({ x: e.target.x(), y: e.target.y() });
@@ -179,6 +254,12 @@ export function EditorCanvas() {
         }}
         onClick={handleStageClick}
         onTap={handleStageClick}
+        onMouseDown={handleDrawStart}
+        onMouseMove={handleDrawMove}
+        onMouseUp={handleDrawEnd}
+        onTouchStart={handleDrawStart}
+        onTouchMove={handleDrawMove}
+        onTouchEnd={handleDrawEnd}
         className="konva-stage"
       >
         <Layer>
@@ -190,9 +271,9 @@ export function EditorCanvas() {
               isSelected={block.id === selectedBlockId}
               isEditing={inlineEdit?.blockId === block.id}
               onSelect={() => {
-                setSelectedBlockId(block.id);
+                if (!isDrawingTool) setSelectedBlockId(block.id);
               }}
-              onDblClick={() => handleBlockDblClick(block.id)}
+              onDblClick={() => !isDrawingTool && handleBlockDblClick(block.id)}
               onDragEnd={(x, y) =>
                 updateBlock(currentImage.id, block.id, {
                   editedX: Math.round(x),
@@ -207,6 +288,66 @@ export function EditorCanvas() {
               }
             />
           ))}
+        </Layer>
+
+        {/* Drawing layer — on top of blocks */}
+        <Layer>
+          {existingLines.map((line, idx) => (
+            <Line
+              key={idx}
+              points={line.points}
+              stroke={line.tool === "eraser" ? "#000000" : line.color}
+              strokeWidth={line.size}
+              lineCap="round"
+              lineJoin="round"
+              tension={0.5}
+              globalCompositeOperation={
+                line.tool === "eraser" ? "destination-out" : "source-over"
+              }
+            />
+          ))}
+          {currentLine && activeTool !== "magicRemover" && (
+            <Line
+              points={currentLine.points}
+              stroke={currentLine.tool === "eraser" ? "#000000" : currentLine.color}
+              strokeWidth={currentLine.size}
+              lineCap="round"
+              lineJoin="round"
+              tension={0.5}
+              globalCompositeOperation={
+                currentLine.tool === "eraser" ? "destination-out" : "source-over"
+              }
+            />
+          )}
+        </Layer>
+
+        {/* Magic remover overlay layer — semi-transparent magenta */}
+        <Layer>
+          {existingMagicLines.map((line, idx) => (
+            <Line
+              key={`magic-${idx}`}
+              points={line.points}
+              stroke="#ff3388"
+              strokeWidth={line.size}
+              lineCap="round"
+              lineJoin="round"
+              tension={0.5}
+              opacity={0.4}
+              globalCompositeOperation="source-over"
+            />
+          ))}
+          {currentLine && activeTool === "magicRemover" && (
+            <Line
+              points={currentLine.points}
+              stroke="#ff3388"
+              strokeWidth={currentLine.size}
+              lineCap="round"
+              lineJoin="round"
+              tension={0.5}
+              opacity={0.4}
+              globalCompositeOperation="source-over"
+            />
+          )}
         </Layer>
       </Stage>
 

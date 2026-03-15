@@ -49,6 +49,17 @@ def credit_tokens(user_id: str, amount: int, type_: str = "topup", reference: st
     return result.data
 
 
+def update_user_profile(user_id: str, display_name: str) -> dict:
+    client = _get_client()
+    result = (
+        client.table("profiles")
+        .update({"display_name": display_name, "updated_at": "now()"})
+        .eq("id", user_id)
+        .execute()
+    )
+    return result.data[0] if result.data else {}
+
+
 def get_transactions(user_id: str, limit: int = 50, offset: int = 0) -> list[dict]:
     client = _get_client()
     result = (

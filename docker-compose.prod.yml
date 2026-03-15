@@ -1,3 +1,9 @@
+# Production compose — uses pre-built images from GitHub Container Registry.
+# Local dev should use docker-compose.yml (builds from source).
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d
+
 services:
   nginx:
     image: nginx:alpine
@@ -8,6 +14,7 @@ services:
     depends_on:
       - front
       - api
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -20,11 +27,10 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
+    restart: unless-stopped
 
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile.api
+    image: ${API_IMAGE:-ghcr.io/your-org/manga-translator/api:latest}
     expose:
       - "5003"
     ports:
@@ -44,47 +50,15 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: ["python", "-m", "server.worker", "--use-gpu", "--verbose"]
-    env_file:
-      - .env
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - SENTRY_DSN=${SENTRY_DSN:-}
-      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
-      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
-    volumes:
-      - ./models:/app/models
-      - ./result:/app/result
-    depends_on:
-      redis:
-        condition: service_healthy
-    deploy:
-      replicas: 1
-    # Uncomment for GPU support:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+    restart: unless-stopped
 
   front:
-    build:
-      context: front
-      dockerfile: Dockerfile
-      args:
-        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    image: ${FRONT_IMAGE:-ghcr.io/your-org/manga-translator/front:latest}
     expose:
       - "3000"
     environment:
       - NODE_ENV=production
+    restart: unless-stopped
 
 volumes:
   redis-data:
