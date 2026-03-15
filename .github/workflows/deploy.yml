@@ -83,7 +83,7 @@ jobs:
           RESPONSE=$(curl -s -X POST "https://api.runpod.io/graphql?api_key=${{ secrets.RUNPOD_API_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "query": "mutation { saveTemplate(input: { id: \"${{ secrets.RUNPOD_TEMPLATE_ID }}\", imageName: \"${{ env.RUNPOD_IMAGE }}:${{ github.sha }}\" }) { id imageName } }"
+              "query": "mutation { saveTemplate(input: { id: \"${{ secrets.RUNPOD_TEMPLATE_ID }}\", name: \"manga-translator-worker\", imageName: \"${{ env.RUNPOD_IMAGE }}:${{ github.sha }}\", dockerArgs: \"\", containerDiskInGb: 20, volumeInGb: 0, env: [] }) { id imageName } }"
             }')
           echo "RunPod API response: $RESPONSE"
           if echo "$RESPONSE" | grep -q '"errors"'; then
