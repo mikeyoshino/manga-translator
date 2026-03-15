@@ -215,7 +215,7 @@ function ProjectContent() {
   const [detectionResolution, setDetectionResolution] = useState(savedSettings.detectionResolution || "1536");
   const [textDetector, setTextDetector] = useState(savedSettings.textDetector || "default");
   const [renderTextDirection, setRenderTextDirection] = useState(savedSettings.renderTextDirection || "auto");
-  const translator: TranslatorKey = "openai";
+  const translator: TranslatorKey = "sugoi";
   const [targetLanguage, setTargetLanguage] = useState(savedSettings.targetLanguage || "THA");
   const [inpaintingSize, setInpaintingSize] = useState(savedSettings.inpaintingSize || "2048");
   const [customUnclipRatio, setCustomUnclipRatio] = useState<number>(savedSettings.customUnclipRatio ?? 2.3);
