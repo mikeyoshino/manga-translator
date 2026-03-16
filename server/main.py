@@ -621,6 +621,17 @@ async def delete_project_image(project_id: str, image_id: str, user: AuthUser = 
     projects.delete_image(image_id, user.id)
     return {"ok": True}
 
+@app.get("/projects/{project_id}/context", tags=["projects"])
+async def get_project_context(project_id: str, user: AuthUser = Depends(get_current_user)):
+    """View the extracted manga context for a project."""
+    data = projects.get_project(project_id, user.id)
+    if not data:
+        raise HTTPException(404, "Project not found")
+    ctx = projects.get_manga_context(project_id)
+    if ctx is None:
+        raise HTTPException(404, "No context extracted yet")
+    return ctx
+
 @app.post("/projects/{project_id}/images/{image_id}/translate", tags=["projects"])
 async def translate_project_image(
     req: Request, project_id: str, image_id: str,
@@ -644,6 +655,21 @@ async def translate_project_image(
 
     conf = Config.parse_raw(config)
     conf._is_web_frontend = True
+
+    # Auto-extract manga context on first translate, reuse cached context after
+    try:
+        from server.context_extraction import extract_manga_context, format_manga_context_prompt
+        manga_ctx = projects.get_manga_context(project_id)
+        if manga_ctx is None:
+            manga_ctx = extract_manga_context(project_id, user.id)
+            if manga_ctx:
+                projects.save_manga_context(project_id, manga_ctx)
+        if manga_ctx:
+            conf.translator.manga_context = format_manga_context_prompt(manga_ctx, conf.translator.target_lang)
+    except Exception as e:
+        import logging
+        logging.getLogger("server").warning("Manga context extraction failed (non-fatal): %s", e)
+
     return await while_streaming(req, transform_to_json, conf, img_bytes)
 
 @app.post("/projects/{project_id}/images/{image_id}/save-result", tags=["projects"])

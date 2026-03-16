@@ -247,6 +247,25 @@ def delete_image(image_id: str, user_id: str):
     client.table("project_images").delete().eq("id", image_id).execute()
 
 
+def save_manga_context(project_id: str, context_data: dict) -> None:
+    """Upsert manga_context and context_analyzed_at on a project."""
+    client = _get_client()
+    client.table("projects").update({
+        "manga_context": context_data,
+        "context_analyzed_at": "now()",
+    }).eq("id", project_id).execute()
+
+
+def get_manga_context(project_id: str) -> dict | None:
+    """Load manga_context for a project. Returns None if not yet analyzed."""
+    client = _get_client()
+    result = client.table("projects").select("manga_context") \
+        .eq("id", project_id).maybe_single().execute()
+    if result.data:
+        return result.data.get("manga_context")
+    return None
+
+
 def cleanup_expired():
     """Delete expired projects and their Storage files. Called on server startup."""
     try:

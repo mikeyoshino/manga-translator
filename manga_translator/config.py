@@ -229,7 +229,9 @@ class TranslatorConfig(BaseModel):
     """Output of one translator goes in another. Example: --translator-chain "google:JPN;sugoi:ENG"."""
     selective_translation: Optional[str] = None
     """Select a translator based on detected language in image. Note the first translation service acts as default if the language isn\'t defined. Example: --translator-chain "google:JPN;sugoi:ENG".'"""
-    
+    manga_context: Optional[str] = None
+    """Manga context prompt for improved translation quality (injected as system message)"""
+
     # 译后检查配置项
     enable_post_translation_check: bool = True
     """Enable post-translation validation check"""

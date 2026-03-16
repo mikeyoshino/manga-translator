@@ -2,8 +2,8 @@
 Smart translator routing for the RunPod worker.
 
 Automatically selects the optimal translator chain based on target_lang.
-JPN↔ENG uses Sugoi (offline, best quality). THA uses NLLB Big (offline,
-direct JPN→THA). Other targets get a two-hop chain: sugoi:ENG → chatgpt:<target>.
+JPN↔ENG uses Sugoi (offline, best quality). Other targets get a two-hop
+chain: sugoi:ENG → chatgpt:<target>.
 """
 
 import logging
@@ -15,8 +15,8 @@ logger = logging.getLogger("smart_routing")
 # Languages that Sugoi handles directly (JPN↔ENG)
 _SUGOI_LANGS = {'ENG', 'JPN'}
 
-# Languages that NLLB Big handles directly (e.g. JPN→THA)
-_NLLB_BIG_LANGS = {'THA'}
+# Languages routed through NLLB Big (currently none — THA moved to ChatGPT for quality)
+_NLLB_BIG_LANGS = set()
 
 
 def build_smart_chain(target_lang: str) -> str:
@@ -26,10 +26,9 @@ def build_smart_chain(target_lang: str) -> str:
     Rules:
       - ENG target → "sugoi:ENG"  (Sugoi JPN→ENG, best offline quality)
       - JPN target → "sugoi:JPN"  (Sugoi ENG→JPN)
-      - THA target → "nllb_big:THA"  (NLLB Big direct JPN→THA, offline)
       - Any other   → "sugoi:ENG;chatgpt:<target>"  (two-hop via English)
 
-    Returns a translator_chain string like "sugoi:ENG" or "nllb_big:THA".
+    Returns a translator_chain string like "sugoi:ENG" or "sugoi:ENG;chatgpt:THA".
     """
     if target_lang in _SUGOI_LANGS:
         return f"sugoi:{target_lang}"
