@@ -193,6 +193,40 @@ export interface EditorImage {
   isDirty: boolean;
 }
 
+// --- Undo/Redo types ---
+
+export type EditorAction =
+  | { type: "block-update"; imageId: string; blockId: string; before: Partial<EditableBlock>; after: Partial<EditableBlock> }
+  | { type: "drawing-line-add"; imageId: string; line: DrawingLine }
+  | { type: "drawing-clear"; imageId: string; lines: DrawingLine[] }
+  | { type: "magic-line-add"; imageId: string; line: DrawingLine }
+  | { type: "magic-clear"; imageId: string; lines: DrawingLine[] }
+  | { type: "magic-remover-apply"; imageId: string; previousImageUrl: string; newImageUrl: string };
+
+export interface DrawingLine {
+  points: number[];
+  color: string;
+  size: number;
+  tool: "pen" | "eraser";
+}
+
+export interface ImageHistory {
+  undoStack: EditorAction[];
+  redoStack: EditorAction[];
+}
+
+const MAX_HISTORY = 50;
+
+export function createEmptyHistory(): ImageHistory {
+  return { undoStack: [], redoStack: [] };
+}
+
+export function pushToHistory(history: ImageHistory, action: EditorAction): ImageHistory {
+  const undoStack = [...history.undoStack, action];
+  if (undoStack.length > MAX_HISTORY) undoStack.shift();
+  return { undoStack, redoStack: [] };
+}
+
 // --- Project types ---
 
 export interface Project {

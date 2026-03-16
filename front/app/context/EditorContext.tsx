@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from "react";
-import type { EditorImage, EditableBlock } from "@/types";
+import type { EditorImage, EditableBlock, EditorAction, ImageHistory } from "@/types";
+import { createEmptyHistory, pushToHistory } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 
 export interface DrawingLine {
@@ -40,6 +41,11 @@ interface EditorContextValue {
   imageHistory: Map<string, string[]>;
   applyMagicRemover: (imageId: string) => Promise<void>;
   undoMagicRemover: (imageId: string) => void;
+  // Unified undo/redo
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null);
@@ -56,10 +62,28 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   const [magicRemoverSize, setMagicRemoverSize] = useState(20);
   const [isInpainting, setIsInpainting] = useState(false);
   const [imageHistory, setImageHistory] = useState<Map<string, string[]>>(new Map());
+  const [historyMap, setHistoryMap] = useState<Map<string, ImageHistory>>(new Map());
   const { session } = useAuth();
   const saveTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const imagesRef = useRef<EditorImage[]>([]);
+  imagesRef.current = images;
 
   const currentImage = images[currentImageIndex] ?? null;
+
+  // Helper to get or create history for an image
+  const getHistory = useCallback((imageId: string): ImageHistory => {
+    return historyMap.get(imageId) || createEmptyHistory();
+  }, [historyMap]);
+
+  // Push an action to the undo stack
+  const pushAction = useCallback((action: EditorAction) => {
+    setHistoryMap((prev) => {
+      const next = new Map(prev);
+      const current = next.get(action.imageId) || createEmptyHistory();
+      next.set(action.imageId, pushToHistory(current, action));
+      return next;
+    });
+  }, []);
 
   const setActiveTool = useCallback((tool: ActiveTool) => {
     setActiveToolRaw(tool);
@@ -68,13 +92,80 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Internal update block (no history recording) - used by undo/redo and auto-save
+  const updateBlockInternal = useCallback(
+    (imageId: string, blockId: string, updates: Partial<EditableBlock>) => {
+      setImages((prev) =>
+        prev.map((img) => {
+          if (img.id !== imageId) return img;
+          const updated = {
+            ...img,
+            isDirty: true,
+            editableBlocks: img.editableBlocks.map((blk) =>
+              blk.id === blockId ? { ...blk, ...updates } : blk
+            ),
+          };
+          // Auto-save to backend if this is a persisted project image
+          if (updated.projectImageId && session?.access_token) {
+            clearTimeout(saveTimerRef.current[imageId]);
+            saveTimerRef.current[imageId] = setTimeout(() => {
+              fetch(`/api/projects/_/images/${updated.projectImageId}/blocks`, {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ editable_blocks: updated.editableBlocks }),
+              })
+                .then(() => {
+                  setImages((prev2) =>
+                    prev2.map((i) => (i.id === imageId ? { ...i, isDirty: false } : i))
+                  );
+                })
+                .catch(() => {});
+            }, 2000);
+          }
+          return updated;
+        })
+      );
+    },
+    [session?.access_token]
+  );
+
+  // Public updateBlock - captures before/after diff and pushes to history
+  const updateBlock = useCallback(
+    (imageId: string, blockId: string, updates: Partial<EditableBlock>) => {
+      // Capture "before" state from ref to avoid stale closures
+      const img = imagesRef.current.find((im) => im.id === imageId);
+      if (img) {
+        const block = img.editableBlocks.find((b) => b.id === blockId);
+        if (block) {
+          const before: Partial<EditableBlock> = {};
+          for (const key of Object.keys(updates) as (keyof EditableBlock)[]) {
+            (before as Record<string, unknown>)[key] = block[key];
+          }
+          pushAction({
+            type: "block-update",
+            imageId,
+            blockId,
+            before,
+            after: updates,
+          });
+        }
+      }
+      updateBlockInternal(imageId, blockId, updates);
+    },
+    [updateBlockInternal, pushAction]
+  );
+
   const addDrawingLine = useCallback((imageId: string, line: DrawingLine) => {
     setDrawingLines((prev) => {
       const next = new Map(prev);
       next.set(imageId, [...(next.get(imageId) || []), line]);
       return next;
     });
-  }, []);
+    pushAction({ type: "drawing-line-add", imageId, line });
+  }, [pushAction]);
 
   const undoDrawingLine = useCallback((imageId: string) => {
     setDrawingLines((prev) => {
@@ -87,12 +178,16 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const clearDrawingLines = useCallback((imageId: string) => {
+    const currentLines = drawingLines.get(imageId) || [];
+    if (currentLines.length > 0) {
+      pushAction({ type: "drawing-clear", imageId, lines: [...currentLines] });
+    }
     setDrawingLines((prev) => {
       const next = new Map(prev);
       next.set(imageId, []);
       return next;
     });
-  }, []);
+  }, [drawingLines, pushAction]);
 
   const addMagicRemoverLine = useCallback((imageId: string, line: DrawingLine) => {
     setMagicRemoverLines((prev) => {
@@ -100,7 +195,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       next.set(imageId, [...(next.get(imageId) || []), line]);
       return next;
     });
-  }, []);
+    pushAction({ type: "magic-line-add", imageId, line });
+  }, [pushAction]);
 
   const undoMagicRemoverLine = useCallback((imageId: string) => {
     setMagicRemoverLines((prev) => {
@@ -113,12 +209,16 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const clearMagicRemoverLines = useCallback((imageId: string) => {
+    const currentLines = magicRemoverLines.get(imageId) || [];
+    if (currentLines.length > 0) {
+      pushAction({ type: "magic-clear", imageId, lines: [...currentLines] });
+    }
     setMagicRemoverLines((prev) => {
       const next = new Map(prev);
       next.set(imageId, []);
       return next;
     });
-  }, []);
+  }, [magicRemoverLines, pushAction]);
 
   const applyMagicRemover = useCallback(async (imageId: string) => {
     const lines = magicRemoverLines.get(imageId);
@@ -192,18 +292,28 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       const resultBlob = await resp.blob();
       const resultUrl = URL.createObjectURL(resultBlob);
 
-      // Push old URL to history (max 5)
+      // Capture previous URL for undo
+      const previousImageUrl = img.originalFile ? "" : (img.originalImageUrl || "");
+
+      // Push old URL to legacy history (max 5)
       setImageHistory((prev) => {
         const next = new Map(prev);
         const stack = [...(next.get(imageId) || [])];
-        const oldUrl = img.originalFile
-          ? "" // can't restore File, but URL was transient
-          : img.originalImageUrl || "";
-        if (oldUrl) stack.push(oldUrl);
+        if (previousImageUrl) stack.push(previousImageUrl);
         if (stack.length > 5) stack.shift();
         next.set(imageId, stack);
         return next;
       });
+
+      // Push to unified history
+      if (previousImageUrl) {
+        pushAction({
+          type: "magic-remover-apply",
+          imageId,
+          previousImageUrl,
+          newImageUrl: resultUrl,
+        });
+      }
 
       // Update image: set new originalImageUrl, clear originalFile
       setImages((prev) =>
@@ -214,12 +324,16 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         )
       );
 
-      // Clear magic remover lines
-      clearMagicRemoverLines(imageId);
+      // Clear magic remover lines (without pushing to history since it's part of apply)
+      setMagicRemoverLines((prev) => {
+        const next = new Map(prev);
+        next.set(imageId, []);
+        return next;
+      });
     } finally {
       setIsInpainting(false);
     }
-  }, [magicRemoverLines, images, session?.access_token, clearMagicRemoverLines]);
+  }, [magicRemoverLines, images, session?.access_token, pushAction]);
 
   const undoMagicRemover = useCallback((imageId: string) => {
     const stack = imageHistory.get(imageId);
@@ -241,44 +355,159 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     );
   }, [imageHistory]);
 
-  const updateBlock = useCallback(
-    (imageId: string, blockId: string, updates: Partial<EditableBlock>) => {
-      setImages((prev) =>
-        prev.map((img) => {
-          if (img.id !== imageId) return img;
-          const updated = {
-            ...img,
-            isDirty: true,
-            editableBlocks: img.editableBlocks.map((blk) =>
-              blk.id === blockId ? { ...blk, ...updates } : blk
-            ),
-          };
-          // Auto-save to backend if this is a persisted project image
-          if (updated.projectImageId && session?.access_token) {
-            clearTimeout(saveTimerRef.current[imageId]);
-            saveTimerRef.current[imageId] = setTimeout(() => {
-              fetch(`/api/projects/_/images/${updated.projectImageId}/blocks`, {
-                method: "PUT",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${session.access_token}`,
-                },
-                body: JSON.stringify({ editable_blocks: updated.editableBlocks }),
-              })
-                .then(() => {
-                  setImages((prev2) =>
-                    prev2.map((i) => (i.id === imageId ? { ...i, isDirty: false } : i))
-                  );
-                })
-                .catch(() => {});
-            }, 2000);
-          }
-          return updated;
-        })
-      );
-    },
-    [session?.access_token]
-  );
+  // --- Unified undo/redo ---
+
+  const applyActionInverse = useCallback((action: EditorAction) => {
+    switch (action.type) {
+      case "block-update":
+        updateBlockInternal(action.imageId, action.blockId, action.before);
+        break;
+      case "drawing-line-add":
+        setDrawingLines((prev) => {
+          const lines = prev.get(action.imageId);
+          if (!lines || lines.length === 0) return prev;
+          const next = new Map(prev);
+          next.set(action.imageId, lines.slice(0, -1));
+          return next;
+        });
+        break;
+      case "drawing-clear":
+        setDrawingLines((prev) => {
+          const next = new Map(prev);
+          next.set(action.imageId, [...(next.get(action.imageId) || []), ...action.lines]);
+          return next;
+        });
+        break;
+      case "magic-line-add":
+        setMagicRemoverLines((prev) => {
+          const lines = prev.get(action.imageId);
+          if (!lines || lines.length === 0) return prev;
+          const next = new Map(prev);
+          next.set(action.imageId, lines.slice(0, -1));
+          return next;
+        });
+        break;
+      case "magic-clear":
+        setMagicRemoverLines((prev) => {
+          const next = new Map(prev);
+          next.set(action.imageId, [...(next.get(action.imageId) || []), ...action.lines]);
+          return next;
+        });
+        break;
+      case "magic-remover-apply":
+        setImages((prev) =>
+          prev.map((im) =>
+            im.id === action.imageId
+              ? { ...im, originalImageUrl: action.previousImageUrl, originalFile: null }
+              : im
+          )
+        );
+        // Also update legacy history
+        setImageHistory((prev) => {
+          const next = new Map(prev);
+          const stack = next.get(action.imageId) || [];
+          next.set(action.imageId, stack.slice(0, -1));
+          return next;
+        });
+        break;
+    }
+  }, [updateBlockInternal]);
+
+  const applyActionForward = useCallback((action: EditorAction) => {
+    switch (action.type) {
+      case "block-update":
+        updateBlockInternal(action.imageId, action.blockId, action.after);
+        break;
+      case "drawing-line-add":
+        setDrawingLines((prev) => {
+          const next = new Map(prev);
+          next.set(action.imageId, [...(next.get(action.imageId) || []), action.line]);
+          return next;
+        });
+        break;
+      case "drawing-clear":
+        setDrawingLines((prev) => {
+          const next = new Map(prev);
+          next.set(action.imageId, []);
+          return next;
+        });
+        break;
+      case "magic-line-add":
+        setMagicRemoverLines((prev) => {
+          const next = new Map(prev);
+          next.set(action.imageId, [...(next.get(action.imageId) || []), action.line]);
+          return next;
+        });
+        break;
+      case "magic-clear":
+        setMagicRemoverLines((prev) => {
+          const next = new Map(prev);
+          next.set(action.imageId, []);
+          return next;
+        });
+        break;
+      case "magic-remover-apply":
+        setImages((prev) =>
+          prev.map((im) =>
+            im.id === action.imageId
+              ? { ...im, originalImageUrl: action.newImageUrl, originalFile: null }
+              : im
+          )
+        );
+        // Also update legacy history
+        setImageHistory((prev) => {
+          const next = new Map(prev);
+          const stack = [...(next.get(action.imageId) || [])];
+          if (action.previousImageUrl) stack.push(action.previousImageUrl);
+          if (stack.length > 5) stack.shift();
+          next.set(action.imageId, stack);
+          return next;
+        });
+        break;
+    }
+  }, [updateBlockInternal]);
+
+  const undo = useCallback(() => {
+    const img = currentImage;
+    if (!img) return;
+    const history = getHistory(img.id);
+    if (history.undoStack.length === 0) return;
+
+    const action = history.undoStack[history.undoStack.length - 1];
+    setHistoryMap((prev) => {
+      const next = new Map(prev);
+      const h = next.get(img.id) || createEmptyHistory();
+      next.set(img.id, {
+        undoStack: h.undoStack.slice(0, -1),
+        redoStack: [...h.redoStack, action],
+      });
+      return next;
+    });
+    applyActionInverse(action);
+  }, [currentImage, getHistory, applyActionInverse]);
+
+  const redo = useCallback(() => {
+    const img = currentImage;
+    if (!img) return;
+    const history = getHistory(img.id);
+    if (history.redoStack.length === 0) return;
+
+    const action = history.redoStack[history.redoStack.length - 1];
+    setHistoryMap((prev) => {
+      const next = new Map(prev);
+      const h = next.get(img.id) || createEmptyHistory();
+      next.set(img.id, {
+        undoStack: [...h.undoStack, action],
+        redoStack: h.redoStack.slice(0, -1),
+      });
+      return next;
+    });
+    applyActionForward(action);
+  }, [currentImage, getHistory, applyActionForward]);
+
+  const currentHistory = currentImage ? getHistory(currentImage.id) : createEmptyHistory();
+  const canUndo = currentHistory.undoStack.length > 0;
+  const canRedo = currentHistory.redoStack.length > 0;
 
   return (
     <EditorContext.Provider
@@ -311,6 +540,10 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         imageHistory,
         applyMagicRemover,
         undoMagicRemover,
+        undo,
+        redo,
+        canUndo,
+        canRedo,
       }}
     >
       {children}
