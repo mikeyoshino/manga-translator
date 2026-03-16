@@ -9,6 +9,7 @@ runs the full translation pipeline, returns TranslationResponse JSON.
 import asyncio
 import base64
 import io
+import json
 import logging
 import os
 import sys
