@@ -91,3 +91,10 @@ Translators can be chained: `--translator "chatgpt:JPN;sugoi:ENG"` runs ChatGPT 
 - PyTorch 2.5.1 with CUDA 11.8
 - pytest + pytest-asyncio for testing
 - Docker base: `pytorch/pytorch:2.5.1-cuda11.8-cudnn9-runtime`
+
+## Observability & Logging Rules
+
+- **Always add structured logging** when writing new code. Use `logging.getLogger(__name__)` and log key operations (start, success, failure) with relevant context (IDs, durations, error details).
+- **Server code**: Use the JSON formatter from `server/log_config.py`. Set `correlation_id` in request-handling paths.
+- **Error tracking**: Sentry Cloud captures errors from API, Worker, and Client. DSN configured via `SENTRY_DSN` (backend) / `VITE_SENTRY_DSN` (frontend) env vars.
+- **When adding try/except**: Always call `sentry_sdk.capture_exception(e)` and `logger.error(...)` with context before re-raising or handling.
