@@ -337,7 +337,7 @@ class Config(BaseModel):
     # ?
     force_simple_sort: bool = False
     """Don't use panel detection for sorting, use a simpler fallback logic instead"""
-    kernel_size: int = 3
+    kernel_size: int = Field(default=3, ge=1)
     """Set the convolution kernel size of the text erasure area to completely clean up text residues"""
     mask_dilation_offset: int = 20
     """By how much to extend the text mask to remove left-over text pixels of the original image."""
