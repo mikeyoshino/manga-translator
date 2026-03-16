@@ -7,20 +7,15 @@ on:
       - '.github/workflows/ci.yml'
       - 'manga_translator/**'
       - 'server/**'
+      - 'front/**'
       - 'test/**'
       - 'pyproject.toml'
       - 'requirements.txt'
       - 'requirements-dev.txt'
   pull_request:
     branches: [main]
-    paths:
-      - '.github/workflows/ci.yml'
-      - 'manga_translator/**'
-      - 'server/**'
-      - 'test/**'
-      - 'pyproject.toml'
-      - 'requirements.txt'
-      - 'requirements-dev.txt'
+    # No path filter — required checks must always run
+
 jobs:
   Tests:
     name: Tests (Python ${{ matrix.python-version }})
@@ -30,9 +25,9 @@ jobs:
         python-version: ["3.10", "3.11"]
       fail-fast: false
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
@@ -47,4 +42,4 @@ jobs:
       run: |
         venv/bin/pylint $(git ls-files '*.py')
       if: always()
-      continue-on-error: true # to not fail CI on lint errors
+      continue-on-error: true
