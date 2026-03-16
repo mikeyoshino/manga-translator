@@ -4,6 +4,11 @@ RunPod Serverless handler — runs on the GPU worker.
 Entrypoint for Dockerfile.runpod. Loads MangaTranslator at module level
 (models persist across warm invocations). Receives image + config,
 runs the full translation pipeline, returns TranslationResponse JSON.
+
+Smart routing: if no explicit translator_chain is set, the handler
+automatically picks the best translator(s) for the target language.
+JPN↔ENG uses Sugoi (offline, best quality). Other targets get a two-hop
+chain: sugoi:ENG → chatgpt:<target>.
 """
 
 import asyncio
@@ -28,6 +33,7 @@ from PIL import Image
 
 from manga_translator import Config, MangaTranslator
 from server.to_json import to_translation
+from server.smart_routing import apply_smart_routing
 
 # --- Load translator once at cold start ---
 logger.info("Initializing MangaTranslator (cold start)...")
@@ -55,6 +61,9 @@ async def handler(event: dict) -> dict:
         image_data = base64.b64decode(image_b64)
         image = Image.open(io.BytesIO(image_data))
         config = Config.model_validate_json(config_json)
+
+        # Apply smart translator routing
+        config = apply_smart_routing(config)
 
         # Run translation
         ctx = await translator.translate(image=image, config=config)

@@ -167,15 +167,46 @@ The API server queries `active_worker_count()` for the `/health` endpoint. Stale
 
 ---
 
+## RunPod Serverless Mode
+
+When `WORKER_MODE=runpod` (production), the API server bypasses Redis and submits jobs directly to RunPod's HTTP API:
+
+```
+┌─────────────┐        HTTP         ┌──────────────────┐       HTTP        ┌──────────────────────┐
+│   Browser    │ ◄────────────────► │   FastAPI API     │ ◄──────────────► │   RunPod Serverless   │
+│  (React SPA) │                    │   (Contabo VPS)   │                  │   runpod_handler.py   │
+└─────────────┘                    └──────────────────┘                   └──────────────────────┘
+                                     │                                      │
+                                     │ submit_job() ──────────────────────► │ handler(event)
+                                     │   POST /v2/{endpoint}/run            │   ├── Deserialize Config
+                                     │                                      │   ├── Smart routing
+                                     │ poll_job() ◄──────────────────────── │   │   (auto-select translator)
+                                     │   GET /v2/{endpoint}/status/{id}     │   ├── MangaTranslator.translate()
+                                     │                                      │   └── Return TranslationResponse
+```
+
+**Key differences from Redis mode:**
+- No Redis needed — RunPod manages its own job queue
+- No real-time progress streaming — API sends a "Processing on GPU..." frame, then polls until complete
+- Smart routing (`server/smart_routing.py`) auto-selects the best translator chain based on `target_lang`
+- Workers are managed by RunPod (auto-scale to 0, cold start on demand)
+
+See [gpu-serverless.md](./gpu-serverless.md) for the full RunPod request flow, smart routing table, and setup details.
+
+---
+
 ## Key Files
 
 | File | Role |
 |------|------|
 | `server/main.py` | FastAPI endpoints — translation, projects, auth, payments |
-| `server/request_extraction.py` | Enqueue → subscribe → return result orchestration |
+| `server/request_extraction.py` | Enqueue → subscribe → return result orchestration (dual-mode) |
 | `server/redis_client.py` | All Redis operations (streams, pubsub, KV, worker registry) |
-| `server/myqueue.py` | Thin `RedisTaskQueue` wrapper for clean interface |
-| `server/worker.py` | Standalone GPU worker process |
+| `server/myqueue.py` | Queue abstraction — `RedisTaskQueue` or `RunPodTaskQueue` based on `WORKER_MODE` |
+| `server/worker.py` | Standalone GPU worker process (Redis mode) |
+| `server/runpod_handler.py` | RunPod serverless entrypoint (RunPod mode) |
+| `server/smart_routing.py` | Auto-selects optimal translator chain for target language |
+| `server/runpod_adapter.py` | API-side HTTP client for RunPod (submit, poll, health) |
 | `server/instance.py` | Worker registry queries for health checks |
 
 ---

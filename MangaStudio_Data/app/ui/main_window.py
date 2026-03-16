@@ -694,6 +694,8 @@ class TranslatorStudioApp(QMainWindow):
                 widget = self._create_api_manager_widget(info)
             elif widget_type == "grid_segmented_button":
                 widget = self._create_grid_segmented_button(info)
+            elif widget_type == "per_language_font_editor":
+                widget = self._create_per_language_font_editor(info)
             elif widget_type == "preset_manager":
                 widget = self._create_preset_manager(info)
             else:
@@ -2324,6 +2326,11 @@ class TranslatorStudioApp(QMainWindow):
             final_config.setdefault('render', {})['gimp_font'] = selected_font_name
         # --- END OF FONT LOGIC ---
 
+        # --- PER-LANGUAGE FONT OVERRIDES ---
+        if hasattr(self, 'per_language_font_overrides') and self.per_language_font_overrides:
+            final_config['language_fonts'] = dict(self.per_language_font_overrides)
+        # --- END OF PER-LANGUAGE FONT OVERRIDES ---
+
         if settings.get('translator_chain'):
             final_config.get("translator", {}).pop('translator', None)
         
@@ -3141,6 +3148,106 @@ class TranslatorStudioApp(QMainWindow):
         requeue_action.triggered.connect(self._requeue_job)
 
         menu.exec(self.history_list_widget.mapToGlobal(position))
+
+    def _create_per_language_font_editor(self, info: dict) -> QWidget:
+        """Creates a per-language font override editor with language/font dropdowns and add/remove buttons."""
+        container = QFrame()
+        container.setObjectName("PerLanguageFontFrame")
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(5)
+
+        # Header with add/remove buttons
+        header_widget = QWidget()
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+
+        label = QLabel(info.get("label", "Per-Language Font Overrides:"))
+        header_layout.addWidget(label)
+        header_layout.addStretch()
+
+        add_btn = QPushButton("➕ Add")
+        remove_btn = QPushButton("➖ Remove")
+        header_layout.addWidget(add_btn)
+        header_layout.addWidget(remove_btn)
+
+        container_layout.addWidget(header_widget)
+
+        # List widget for language-font pairs
+        self.per_lang_font_list = DynamicHeightListWidget()
+        container_layout.addWidget(self.per_lang_font_list)
+
+        # Store the override dict
+        self.per_language_font_overrides = {}
+
+        add_btn.clicked.connect(self._add_per_lang_font_row)
+        remove_btn.clicked.connect(self._remove_per_lang_font_row)
+
+        self.widget_references[info['key']] = container
+        return container
+
+    def _create_per_lang_font_row_widget(self) -> QWidget:
+        """Creates a single row with a language dropdown and a font dropdown."""
+        row_widget = QWidget()
+        layout = QHBoxLayout(row_widget)
+        layout.setContentsMargins(5, 5, 5, 5)
+
+        lang_combo = NoScrollComboBox()
+        # Only add target languages (skip Auto-Detect)
+        for display_name, code in LANGUAGES.items():
+            if code != "auto":
+                lang_combo.addItem(display_name, code)
+
+        font_combo = NoScrollComboBox()
+        font_names = list(self.font_map.keys())
+        if font_names:
+            font_combo.addItems(font_names)
+        else:
+            font_combo.addItem("No fonts found")
+            font_combo.setEnabled(False)
+
+        layout.addWidget(QLabel("Language:"))
+        layout.addWidget(lang_combo)
+        layout.addWidget(QLabel("Font:"))
+        layout.addWidget(font_combo)
+
+        row_widget.lang_combo = lang_combo
+        row_widget.font_combo = font_combo
+
+        lang_combo.currentTextChanged.connect(lambda: self._update_per_lang_font_overrides())
+        font_combo.currentTextChanged.connect(lambda: self._update_per_lang_font_overrides())
+
+        return row_widget
+
+    def _add_per_lang_font_row(self):
+        """Adds a new language-font pair row."""
+        row_widget = self._create_per_lang_font_row_widget()
+        list_item = QListWidgetItem(self.per_lang_font_list)
+        list_item.setSizeHint(row_widget.sizeHint())
+        self.per_lang_font_list.addItem(list_item)
+        self.per_lang_font_list.setItemWidget(list_item, row_widget)
+        self._update_per_lang_font_overrides()
+        self.per_lang_font_list.updateGeometry()
+
+    def _remove_per_lang_font_row(self):
+        """Removes the selected language-font pair row."""
+        current_row = self.per_lang_font_list.currentRow()
+        if current_row >= 0:
+            self.per_lang_font_list.takeItem(current_row)
+            self._update_per_lang_font_overrides()
+
+    def _update_per_lang_font_overrides(self):
+        """Reads all rows and updates the per_language_font_overrides dict."""
+        self.per_language_font_overrides = {}
+        for i in range(self.per_lang_font_list.count()):
+            item = self.per_lang_font_list.item(i)
+            row_widget = self.per_lang_font_list.itemWidget(item)
+            if row_widget:
+                lang_code = row_widget.lang_combo.currentData()
+                font_name = row_widget.font_combo.currentText()
+                if lang_code and font_name and font_name in self.font_map:
+                    self.per_language_font_overrides[lang_code] = self.font_map[font_name]
+        self._on_setting_changed('per_language_fonts')
 
     def _build_font_map(self):
         """Scans the project's /fonts folder to create a name-to-filepath map."""

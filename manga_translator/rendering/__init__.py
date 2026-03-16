@@ -242,13 +242,15 @@ async def dispatch(
     hyphenate: bool = True,
     render_mask: np.ndarray = None,
     line_spacing: int = None,
-    disable_font_border: bool = False
+    disable_font_border: bool = False,
+    language_fonts: dict = None,
     ) -> np.ndarray:
 
     # Use language-specific font if no explicit font_path and target language has one
     if not font_path and text_regions:
         target_lang = getattr(text_regions[0], 'target_lang', '')
-        lang_font = text_render.LANGUAGE_FONTS.get(target_lang, '')
+        fonts = language_fonts or text_render.LANGUAGE_FONTS
+        lang_font = fonts.get(target_lang, '')
         text_render.set_font(lang_font)
     else:
         text_render.set_font(font_path)

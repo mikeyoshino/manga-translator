@@ -218,6 +218,11 @@ FALLBACK_FONTS = [
 # Language-specific font paths (used when target_lang is known)
 LANGUAGE_FONTS = {
     'THA': os.path.join(BASE_PATH, 'fonts/Kanit-Regular.ttf'),
+    'ENG': os.path.join(BASE_PATH, 'fonts/comic shanns 2.ttf'),
+    'JPN': os.path.join(BASE_PATH, 'fonts/msgothic.ttc'),
+    'KOR': os.path.join(BASE_PATH, 'fonts/NotoSansMonoCJK-VF.ttf.ttc'),
+    'CHS': os.path.join(BASE_PATH, 'fonts/msyh.ttc'),
+    'CHT': os.path.join(BASE_PATH, 'fonts/msyh.ttc'),
 }
 FONT_SELECTION: List[freetype.Face] = []
 font_cache = {}

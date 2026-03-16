@@ -400,6 +400,14 @@
     "default": "Sans-serif",
     "tooltip": "The font family to use for the translated text. You can use system fonts or place fonts in the 'fonts' folder."
   },
+  "per_language_fonts": {
+    "widget": "per_language_font_editor",
+    "group": "Render & Output",
+    "order": 435,
+    "label": "Per-Language Font Overrides:",
+    "default": {},
+    "tooltip": "Override the default font for specific target languages. Each language can have its own font from the /fonts folder."
+  },
   "font_color": {
     "widget": "entry_with_button",
     "group": "Render & Output",
