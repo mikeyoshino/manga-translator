@@ -2,7 +2,7 @@ import { useEditor } from "@/context/EditorContext";
 import { useNavigate } from "react-router";
 import { exportSingleImage, exportAllAsZip } from "@/utils/exportZip";
 import { useCallback } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, FolderArchive, Pencil, Eraser, Undo2, Sparkles } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, FolderArchive, Pencil, Eraser, Undo2, Redo2, Sparkles } from "lucide-react";
 import { getEditorLocale, editorT } from "@/utils/editorI18n";
 
 export function EditorToolbar() {
@@ -11,6 +11,7 @@ export function EditorToolbar() {
     setSelectedBlockId, activeTool, setActiveTool,
     drawingLines, undoDrawingLine,
     magicRemoverLines, undoMagicRemoverLine,
+    undo, redo, canUndo, canRedo,
   } = useEditor();
   const navigate = useNavigate();
   const locale = getEditorLocale();
@@ -132,6 +133,26 @@ export function EditorToolbar() {
             <Undo2 className="w-4 h-4" />
           </button>
         )}
+      </div>
+
+      {/* Undo/Redo buttons */}
+      <div className="flex items-center gap-1 ml-4 border-l border-slate-200 pl-4">
+        <button
+          onClick={undo}
+          disabled={!canUndo}
+          title={`${i.undo} (Ctrl+Z)`}
+          className="p-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-40"
+        >
+          <Undo2 className="w-4 h-4" />
+        </button>
+        <button
+          onClick={redo}
+          disabled={!canRedo}
+          title={`${i.redo} (Ctrl+Y)`}
+          className="p-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-40"
+        >
+          <Redo2 className="w-4 h-4" />
+        </button>
       </div>
 
       <div className="ml-auto flex items-center gap-2">

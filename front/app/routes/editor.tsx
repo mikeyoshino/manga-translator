@@ -33,7 +33,7 @@ export default function EditorPage() {
 }
 
 function EditorContent() {
-  const { images, currentImage } = useEditor();
+  const { images, currentImage, undo, redo } = useEditor();
   const navigate = useNavigate();
   const [isClient, setIsClient] = useState(false);
   const locale = getEditorLocale();
@@ -42,6 +42,30 @@ function EditorContent() {
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+
+      if (e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if (e.key === "z" && e.shiftKey) {
+        e.preventDefault();
+        redo();
+      } else if (e.key === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undo, redo]);
 
   useEffect(() => {
     if (isClient && images.length === 0) {
