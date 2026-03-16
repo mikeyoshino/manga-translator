@@ -86,145 +86,54 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
         # print("-" * 50)
         # logger.debug(f"Calculated target font size: {target_font_size} for text '{region.translation}'")  
 
-        # Single-axis text box expansion
-        single_axis_expanded = False
+        # Measure actual rendered text size and expand box to fit
         dst_points = None
-        
-        if region.horizontal: 
-            used_rows = len(region.texts)
-            # logger.debug(f"Horizontal text - used rows: {used_rows}")
-            
-            line_text_list, _ = text_render.calc_horizontal(
-                region.font_size,
+        box_w, box_h = region.unrotated_size
+
+        if region.horizontal:
+            line_text_list, line_width_list = text_render.calc_horizontal(
+                target_font_size,
                 region.translation,
-                max_width=region.unrotated_size[0],
-                max_height=region.unrotated_size[1],
+                max_width=box_w,
+                max_height=box_h,
                 language=getattr(region, "target_lang", "en_US")
             )
-            needed_rows = len(line_text_list)
-            # logger.debug(f"Needed rows: {needed_rows}")                
+            needed_width = max(line_width_list) if line_width_list else box_w
+            needed_height = target_font_size * len(line_text_list)
 
-            if needed_rows > used_rows:
-                scale_x = ((needed_rows - used_rows) / used_rows) * 1 + 1
-                try:  
-                    poly = Polygon(region.unrotated_min_rect[0])
-                    minx, miny, maxx, maxy = poly.bounds
-                    poly = affinity.scale(poly, xfact=scale_x, yfact=1.0, origin=(minx, miny))        
-                
-                    pts = np.array(poly.exterior.coords[:4])  
-                    dst_points = rotate_polygons(  
-                        region.center, pts.reshape(1, -1), -region.angle,  
-                        to_int=False  
-                    ).reshape(-1, 4, 2)  
-                    # 移除边界限制，允许文本超出检测框边界
-                    # dst_points[..., 0] = dst_points[..., 0].clip(0, img.shape[1] - 1)  
-                    # dst_points[..., 1] = dst_points[..., 1].clip(0, img.shape[0] - 1)  
-                    dst_points = dst_points.astype(np.int64)
-                    single_axis_expanded = True
-                    # logger.debug(f"Successfully expanded horizontal text width: xfact={scale_x:.2f}")  
-                except Exception as e:  
-                    # logger.error(f"Failed to expand horizontal text: {e}")  
-                    pass
-                    
-        if region.vertical:
-            used_cols = len(region.texts)
-            # logger.debug(f"Vertical text - used columns: {used_cols}")
-            
-            line_text_list, _ = text_render.calc_vertical(
-                region.font_size, 
-                region.translation, 
-                max_height=region.unrotated_size[1],
+            scale_x = max(1.0, needed_width / box_w) if box_w > 0 else 1.0
+            scale_y = max(1.0, needed_height / box_h) if box_h > 0 else 1.0
+        elif region.vertical:
+            line_text_list, line_width_list = text_render.calc_vertical(
+                target_font_size,
+                region.translation,
+                max_height=box_h,
             )
-            needed_cols = len(line_text_list)
-            # logger.debug(f"Needed columns: {needed_cols}") 
-            if needed_cols > used_cols:
-                scale_x = ((needed_cols - used_cols) / used_cols) * 1 + 1
-                try:  
-                    poly = Polygon(region.unrotated_min_rect[0])
-                    minx, miny, maxx, maxy = poly.bounds
-                    poly = affinity.scale(poly, xfact=1.0, yfact=scale_x, origin=(minx, miny))                    
-                    
-                    pts = np.array(poly.exterior.coords[:4])  
-                    dst_points = rotate_polygons(  
-                        region.center, pts.reshape(1, -1), -region.angle,  
-                        to_int=False  
-                    ).reshape(-1, 4, 2)  
-                    # 移除边界限制，允许文本超出检测框边界
-                    # dst_points[..., 0] = dst_points[..., 0].clip(0, img.shape[1] - 1)  
-                    # dst_points[..., 1] = dst_points[..., 1].clip(0, img.shape[0] - 1)  
-                    dst_points = dst_points.astype(np.int64)
-                    single_axis_expanded = True
-                    # logger.debug(f"Successfully expanded vertical text width: xfact={scale_x:.2f}")  
-                except Exception as e:  
-                    # logger.error(f"Failed to expand vertical text: {e}")  
-                    pass
+            needed_width = target_font_size * len(line_text_list)
 
-        # If single-axis expansion failed, use general scaling
-        if not single_axis_expanded:
-            # Calculate scaling factor based on text length ratio
-            orig_text = getattr(region, "text_raw", region.text)
-            char_count_orig = count_text_length(orig_text)
-            char_count_trans = count_text_length(region.translation.strip())     
-            length_ratio = 1.0
+            scale_x = max(1.0, needed_width / box_w) if box_w > 0 else 1.0
+            scale_y = 1.0
+        else:
+            scale_x = 1.0
+            scale_y = 1.0
 
-            if char_count_orig > 0 and char_count_trans > char_count_orig:  
-                increase_percentage = (char_count_trans - char_count_orig) / char_count_orig
-                font_increase_ratio = 1 + (increase_percentage * 0.3)
-                font_increase_ratio = min(1.5, max(1.0, font_increase_ratio))
-                # logger.debug(f"Translation is {increase_percentage:.2%} longer, font increase ratio: {font_increase_ratio:.2f}")
-                target_font_size = int(target_font_size * font_increase_ratio)
-                # logger.debug(f"Adjusted target font size: {target_font_size}")
-                # Need greater bounding box scaling to accommodate larger font size and longer text
-                target_scale = max(1, min(1 + increase_percentage * 0.3, 2))  # Possibly max(1, min(1 + (font_increase_ratio-1), 2))
-                # logger.debug(f"Translation is longer than original and font increased, need larger bounding box scaling. Target scale factor: {target_scale:.2f}")
-            # Short text box expansion is quite aggressive, in many cases short text boxes don't need expansion
-            # elif char_count_orig > 0 and char_count_trans < char_count_orig:
-            #     # Translation is shorter, increase font proportionally
-            #     decrease_percentage = (char_count_orig - char_count_trans) / char_count_orig
-            #     # Font increase ratio equals text reduction ratio
-            #     font_increase_ratio = 1 + decrease_percentage
-            #     # Limit font increase ratio to reasonable range, e.g., between 1.0 and 1.5
-            #     font_increase_ratio = min(1.5, max(1.0, font_increase_ratio))
-            #     logger.debug(f"Translation is {decrease_percentage:.2%} shorter than original, font increase ratio: {font_increase_ratio:.2f}")
-            #     # Update target font size
-            #     target_font_size = int(target_font_size * font_increase_ratio)
-            #     logger.debug(f"Adjusted target font size: {target_font_size}")
-            #     target_scale = 1.0  # No additional bounding box scaling needed
-            #     logger.debug(f"Translation is shorter than original, no bounding box scaling applied, only font increase. Target scale factor: {target_scale:.2f}")            
-            else:  
-                target_scale = 1              
-                # logger.debug(f"No length ratio scaling applied. Target scale factor: {target_scale:.2f}")   
+        # Cap expansion at 2x per axis to prevent absurd growth
+        scale_x = min(scale_x, 2.0)
+        scale_y = min(scale_y, 2.0)
 
-            # Calculate final scaling factor
-            font_size_scale = (((target_font_size - original_region_font_size) / original_region_font_size) * 0.4 + 1) if original_region_font_size > 0 else 1.0  
-            # logger.debug(f"Font size ratio: ({target_font_size} / {original_region_font_size})")  
-            final_scale = max(font_size_scale, target_scale)
-            final_scale = max(1, min(final_scale, 1.1))  
-            
-            # logger.debug(f"Final scaling factor: {final_scale:.2f}")  
-
-            # Scale bounding box if needed
-            if final_scale > 1.001:  
-                # logger.debug(f"Scaling bounding box: text='{region.translation}', scale={final_scale:.2f}")  
-                try:  
-                    poly = Polygon(region.unrotated_min_rect[0])  
-                     # Scale from the center  
-                    poly = affinity.scale(poly, xfact=final_scale, yfact=final_scale, origin='center')  
-                    scaled_unrotated_points = np.array(poly.exterior.coords[:4])  
-
-                    dst_points = rotate_polygons(region.center, scaled_unrotated_points.reshape(1, -1), -region.angle, to_int=False).reshape(-1, 4, 2)  
-                    # 移除边界限制，允许文本超出检测框边界
-                    # dst_points[..., 0] = dst_points[..., 0].clip(0, img.shape[1] - 1)  
-                    # dst_points[..., 1] = dst_points[..., 1].clip(0, img.shape[0] - 1)  
-                    dst_points = dst_points.astype(np.int64)  
-                    dst_points = dst_points.reshape((-1, 4, 2))  
-                    # logger.debug(f"Finished calculating scaled dst_points.")  
-
-                except Exception as e:  
-                    # logger.error(f"Error during scaling for text '{region.translation}': {e}. Using original min_rect.")  
-                    dst_points = region.min_rect
-            else:
+        if scale_x > 1.001 or scale_y > 1.001:
+            try:
+                poly = Polygon(region.unrotated_min_rect[0])
+                poly = affinity.scale(poly, xfact=scale_x, yfact=scale_y, origin='center')
+                pts = np.array(poly.exterior.coords[:4])
+                dst_points = rotate_polygons(
+                    region.center, pts.reshape(1, -1), -region.angle,
+                    to_int=False
+                ).reshape(-1, 4, 2).astype(np.int64)
+            except Exception:
                 dst_points = region.min_rect
+        else:
+            dst_points = region.min_rect
 
         # Store results and update font size
         dst_points_list.append(dst_points)  
