@@ -20,4 +20,4 @@ COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 ENV NODE_ENV=production
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["npx", "react-router-serve", "--host", "0.0.0.0", "./build/server/index.js"]
