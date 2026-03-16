@@ -15,6 +15,9 @@ logger = logging.getLogger("smart_routing")
 # Languages that Sugoi handles directly (JPN↔ENG)
 _SUGOI_LANGS = {'ENG', 'JPN'}
 
+# Languages routed through NLLB Big (currently none — THA moved to ChatGPT for quality)
+_NLLB_BIG_LANGS = set()
+
 
 def build_smart_chain(target_lang: str) -> str:
     """
@@ -25,10 +28,12 @@ def build_smart_chain(target_lang: str) -> str:
       - JPN target → "sugoi:JPN"  (Sugoi ENG→JPN)
       - Any other   → "sugoi:ENG;chatgpt:<target>"  (two-hop via English)
 
-    Returns a translator_chain string like "sugoi:ENG;chatgpt:THA".
+    Returns a translator_chain string like "sugoi:ENG" or "sugoi:ENG;chatgpt:THA".
     """
     if target_lang in _SUGOI_LANGS:
         return f"sugoi:{target_lang}"
+    if target_lang in _NLLB_BIG_LANGS:
+        return f"nllb_big:{target_lang}"
     return f"sugoi:ENG;chatgpt:{target_lang}"
 
 

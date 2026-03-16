@@ -163,7 +163,7 @@ def test_smart_chain_jpn_target():
 
 
 def test_smart_chain_tha_target():
-    """THA target uses two-hop: sugoi→chatgpt."""
+    """THA target uses two-hop: sugoi→chatgpt (better quality with context)."""
     assert build_smart_chain('THA') == 'sugoi:ENG;chatgpt:THA'
 
 
