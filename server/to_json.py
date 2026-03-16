@@ -43,9 +43,9 @@ class Translation(BaseModel):
     prob: float
     text_color: TextColor
     text: dict[str, str]
-    background: NumpyNdarray = Field(
+    background: NumpyNdarray | str = Field(
         ...,
-        description="Background image encoded as a base64 string",
+        description="Background image as ndarray or base64 string",
         examples=["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA..."]
     )
     font_size: float = -1
@@ -61,7 +61,7 @@ class Translation(BaseModel):
     class Config:
         arbitrary_types_allowed = True
         json_encoders = {
-            np.ndarray: lambda array: Translation.encode_background(array)
+            np.ndarray: lambda array: Translation.encode_background(array) if isinstance(array, np.ndarray) else array
         }
 
     @staticmethod
