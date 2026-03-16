@@ -116,26 +116,36 @@ class TranslationWorker:
 
     async def _process_job(self, r: aioredis.Redis, msg_id: bytes, fields: dict):
         """Process a single translation job."""
+        import time as _time
+
         task_id = fields[b"task_id"].decode()
         config_json = fields[b"config"].decode()
         correlation_id.set(task_id)
+
+        config = Config.model_validate_json(config_json)
+
+        # Enrich Sentry scope with job-level context
         sentry_sdk.set_tag("task_id", task_id)
         sentry_sdk.set_tag("worker_id", self.worker_id)
+        sentry_sdk.set_tag("translator", str(config.translator.id if hasattr(config.translator, 'id') else config.translator))
+        sentry_sdk.set_tag("detector", str(config.detector))
 
         logger.info(f"[{self.worker_id}] Processing task {task_id}")
 
         self._current_task_id = task_id
+        job_start = _time.monotonic()
 
         try:
             # Download image from Redis
+            sentry_sdk.add_breadcrumb(category="worker", message="Downloading image from Redis", level="info")
             image_data = await get_task_image(task_id)
             if image_data is None:
                 await publish_progress(task_id, 2, b"Image data expired or not found")
                 await r.xack(STREAM_KEY, GROUP_NAME, msg_id)
                 return
 
+            sentry_sdk.add_breadcrumb(category="worker", message="Image downloaded, starting translation", level="info")
             image = Image.open(io.BytesIO(image_data))
-            config = Config.model_validate_json(config_json)
 
             # Acquire lock — one job at a time per worker
             self.lock.acquire()
@@ -144,6 +154,8 @@ class TranslationWorker:
             finally:
                 self.lock.release()
 
+            sentry_sdk.add_breadcrumb(category="worker", message="Translation completed, storing result", level="info")
+
             # Serialize result and store
             result_bytes = pickle.dumps(ctx)
             await store_result(task_id, result_bytes)
@@ -151,12 +163,14 @@ class TranslationWorker:
             # Publish result frame (code 0)
             await publish_progress(task_id, 0, result_bytes)
 
-            logger.info(f"[{self.worker_id}] Task {task_id} completed")
+            duration_ms = round((_time.monotonic() - job_start) * 1000, 1)
+            logger.info(f"[{self.worker_id}] Task {task_id} completed in {duration_ms}ms")
 
         except Exception as e:
+            duration_ms = round((_time.monotonic() - job_start) * 1000, 1)
             sentry_sdk.capture_exception(e)
             error_msg = f"Translation failed: {e}"
-            logger.error(f"[{self.worker_id}] Task {task_id} error: {error_msg}")
+            logger.error(f"[{self.worker_id}] Task {task_id} error after {duration_ms}ms: {error_msg}")
             await publish_progress(task_id, 2, error_msg.encode("utf-8"))
 
         finally:
