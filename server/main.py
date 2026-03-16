@@ -667,8 +667,10 @@ async def translate_project_image(
         if manga_ctx:
             conf.translator.manga_context = format_manga_context_prompt(manga_ctx, conf.translator.target_lang)
     except Exception as e:
-        import logging
-        logging.getLogger("server").warning("Manga context extraction failed (non-fatal): %s", e)
+        import logging, traceback
+        logging.getLogger("server").warning(
+            "Manga context extraction failed (non-fatal): %s\n%s", e, traceback.format_exc()
+        )
 
     return await while_streaming(req, transform_to_json, conf, img_bytes)
 

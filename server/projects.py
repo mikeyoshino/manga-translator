@@ -249,10 +249,11 @@ def delete_image(image_id: str, user_id: str):
 
 def save_manga_context(project_id: str, context_data: dict) -> None:
     """Upsert manga_context and context_analyzed_at on a project."""
+    from datetime import datetime, timezone
     client = _get_client()
     client.table("projects").update({
         "manga_context": context_data,
-        "context_analyzed_at": "now()",
+        "context_analyzed_at": datetime.now(timezone.utc).isoformat(),
     }).eq("id", project_id).execute()
 
 
