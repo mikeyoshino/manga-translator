@@ -665,7 +665,7 @@ async def translate_project_image(
             if manga_ctx:
                 projects.save_manga_context(project_id, manga_ctx)
         if manga_ctx:
-            conf.translator.manga_context = format_manga_context_prompt(manga_ctx)
+            conf.translator.manga_context = format_manga_context_prompt(manga_ctx, conf.translator.target_lang)
     except Exception as e:
         import logging
         logging.getLogger("server").warning("Manga context extraction failed (non-fatal): %s", e)

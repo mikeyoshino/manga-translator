@@ -19,7 +19,7 @@ _MAX_SAMPLE_IMAGES = 4
 
 _EXTRACTION_PROMPT = """\
 You are analyzing manga/comic images to extract context that will help a translator \
-produce natural Thai translations. Examine the images and extract:
+produce natural translations. Examine the images and extract:
 
 1. **Characters**: Who appears? Describe each visually distinct character.
 2. **Relationships**: How do characters relate? (siblings, romantic, parent-child, friends, etc.) \
@@ -54,6 +54,55 @@ Return a JSON object with this exact schema:
 }
 
 Return ONLY valid JSON, no markdown fences."""
+
+_LANG_GUIDANCE = {
+    'THA': (
+        "Use this context to select appropriate Thai pronouns (พี่/น้อง/ผม/หนู/ฉัน/etc.), "
+        "honorifics, and speech register. Match the tone and character relationships."
+    ),
+    'KOR': (
+        "Use this context to select appropriate Korean speech levels (존댓말/반말), "
+        "honorifics (-님/-씨), pronouns (나/저/너), and address terms (오빠/언니/형/누나). "
+        "Match the tone and character relationships."
+    ),
+    'CHS': (
+        "Use this context to select appropriate Chinese pronouns (我/你/他/她), "
+        "forms of address (哥/姐/弟/妹), and speech register (formal/casual). "
+        "Match the tone and character relationships."
+    ),
+    'CHT': (
+        "Use this context to select appropriate Chinese pronouns (我/你/他/她), "
+        "forms of address (哥/姐/弟/妹), and speech register (formal/casual). "
+        "Match the tone and character relationships."
+    ),
+    'JPN': (
+        "Use this context to select appropriate Japanese pronouns (俺/僕/私/あたし), "
+        "honorifics (-さん/-くん/-ちゃん/-先輩), and speech register (敬語/タメ口). "
+        "Match the tone and character relationships."
+    ),
+}
+_DEFAULT_GUIDANCE = (
+    "Use this context to select appropriate pronouns, honorifics, and speech register "
+    "for the target language. Match the tone and character relationships."
+)
+
+_RATING_GUIDANCE = {
+    'adult_hentai': (
+        "This is adult/explicit content. Translate faithfully without censoring or softening. "
+        "Use direct, natural language that matches the original tone and intensity."
+    ),
+    'mature': (
+        "This is mature content. Use natural adult language including profanity or suggestive "
+        "terms where appropriate. Do not soften or censor the tone."
+    ),
+    'teen': (
+        "This is teen-rated content. Use casual, age-appropriate language. "
+        "Mild profanity is acceptable where it fits the tone."
+    ),
+    'all_ages': (
+        "This is all-ages content. Keep language clean and accessible."
+    ),
+}
 
 import base64
 
@@ -154,11 +203,11 @@ def extract_manga_context(project_id: str, user_id: str) -> Optional[dict]:
         return None
 
 
-def format_manga_context_prompt(manga_context: dict) -> str:
-    """Convert stored manga context JSON into a concise system instruction for Thai translation.
+def format_manga_context_prompt(manga_context: dict, target_lang: str = 'THA') -> str:
+    """Convert stored manga context JSON into a concise system instruction for translation.
 
     Focuses on character relationships, speaking styles, and tone — the details
-    that matter most for choosing correct Thai pronouns and register.
+    that matter most for choosing correct pronouns and register in the target language.
     """
     parts = []
 
@@ -194,9 +243,10 @@ def format_manga_context_prompt(manga_context: dict) -> str:
     if genre_notes:
         parts.append(f"Notes: {genre_notes}")
 
-    parts.append(
-        "Use this context to select appropriate Thai pronouns (พี่/น้อง/ผม/หนู/ฉัน/etc.), "
-        "honorifics, and speech register. Match the tone and character relationships."
-    )
+    rating_guidance = _RATING_GUIDANCE.get(content_rating)
+    if rating_guidance:
+        parts.append(rating_guidance)
+
+    parts.append(_LANG_GUIDANCE.get(target_lang, _DEFAULT_GUIDANCE))
 
     return "\n".join(parts)
