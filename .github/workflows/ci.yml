@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/ci.yml'
       - 'manga_translator/**'
+      - 'server/**'
       - 'test/**'
       - 'pyproject.toml'
       - 'requirements.txt'
@@ -15,6 +16,7 @@ on:
     paths:
       - '.github/workflows/ci.yml'
       - 'manga_translator/**'
+      - 'server/**'
       - 'test/**'
       - 'pyproject.toml'
       - 'requirements.txt'
