@@ -60,7 +60,7 @@ async def handler(event: dict) -> dict:
 
         # Convert to JSON-serializable response
         response = to_translation(ctx)
-        return response.model_dump()
+        return json.loads(response.model_dump_json())
 
     except Exception as e:
         logger.error("Handler error: %s\n%s", e, traceback.format_exc())
