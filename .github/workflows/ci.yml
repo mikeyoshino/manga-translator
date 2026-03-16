@@ -20,7 +20,8 @@ on:
       - 'requirements.txt'
       - 'requirements-dev.txt'
 jobs:
-  build:
+  Tests:
+    name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
