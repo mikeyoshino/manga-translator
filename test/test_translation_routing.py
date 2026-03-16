@@ -163,18 +163,18 @@ def test_smart_chain_jpn_target():
 
 
 def test_smart_chain_tha_target():
-    """THA target uses two-hop: sugoi→chatgpt."""
-    assert build_smart_chain('THA') == 'sugoi:ENG;chatgpt:THA'
+    """THA target uses ChatGPT directly (no Sugoi intermediate hop)."""
+    assert build_smart_chain('THA') == 'chatgpt:THA'
 
 
 def test_smart_chain_kor_target():
-    """KOR target uses two-hop: sugoi→chatgpt."""
-    assert build_smart_chain('KOR') == 'sugoi:ENG;chatgpt:KOR'
+    """KOR target uses ChatGPT directly."""
+    assert build_smart_chain('KOR') == 'chatgpt:KOR'
 
 
 def test_smart_chain_chs_target():
-    """CHS target uses two-hop: sugoi→chatgpt."""
-    assert build_smart_chain('CHS') == 'sugoi:ENG;chatgpt:CHS'
+    """CHS target uses ChatGPT directly."""
+    assert build_smart_chain('CHS') == 'chatgpt:CHS'
 
 
 def test_apply_smart_routing_sets_chain():
@@ -185,7 +185,7 @@ def test_apply_smart_routing_sets_chain():
     config.translator.selective_translation = None
 
     result = apply_smart_routing(config)
-    assert result.translator.translator_chain == 'sugoi:ENG;chatgpt:THA'
+    assert result.translator.translator_chain == 'chatgpt:THA'
 
 
 def test_apply_smart_routing_skips_existing_chain():
