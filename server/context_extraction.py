@@ -6,6 +6,7 @@ import os
 from typing import Optional
 
 import openai
+import sentry_sdk
 
 from server.supabase_client import _get_client
 
@@ -196,9 +197,11 @@ def extract_manga_context(project_id: str, user_id: str) -> Optional[dict]:
                      project_id, len(context.get("characters", [])), len(context.get("relationships", [])))
         return context
     except json.JSONDecodeError as e:
+        sentry_sdk.capture_exception(e)
         logger.error("Failed to parse manga context JSON: %s\nRaw: %s", e, raw[:500])
         return None
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         logger.error("OpenAI Vision API error during context extraction: %s", e)
         return None
 
