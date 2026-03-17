@@ -141,8 +141,7 @@ Subsequent requests (warm): **~5-15s per image**
 |----------|----------|
 | Set min workers = 1 | No cold start, but ~$160-250/mo for always-on GPU |
 | Increase idle timeout (10-15 min) | Stays warm between bursts, costs more during gaps |
-| Bake models into Docker image | Skips download, but image is 10GB+ |
-| Network volumes for model cache | Models on fast SSD, cuts 10-30s off cold start |
+| **Network Volume (current)** | **Models on persistent SSD, fast builds, first boot downloads once** |
 
 ### Scale-Down Timeout
 
@@ -174,6 +173,73 @@ Subsequent requests (warm): **~5-15s per image**
 | 1 | 2-5 min |
 | 2 | 1-2.5 min |
 | 4 | 30-75s |
+
+---
+
+## Network Volume (Persistent Model Storage)
+
+Models (~5-8 GB) are stored on a RunPod **Network Volume** instead of being baked into the Docker image. This gives us:
+
+- **Fast builds** — Docker image is lightweight (no model download during build)
+- **Fast cold starts** — models load from persistent SSD after first boot
+- **Single download** — models are downloaded once to the volume; subsequent workers reuse them
+
+### How It Works
+
+On startup, `server/runpod_handler.py` runs this sequence before initializing `MangaTranslator`:
+
+```
+1. Check if /runpod-volume exists (RunPod mounts it automatically)
+2. If yes: symlink /app/models → /runpod-volume/models
+3. Run _ensure_models() — downloads any missing models (no-op if cached)
+4. If no volume: fall back to /app/models (local dev compatibility)
+```
+
+### Cold Start Timeline
+
+| Scenario | Model download | Model load | Total |
+|----------|---------------|------------|-------|
+| **First boot (empty volume)** | ~5-10 min | ~10-60s | ~6-11 min |
+| **Subsequent cold starts** | 0s (cached) | ~10-60s | ~10-60s |
+| **Warm worker** | 0s | 0s | ~5-15s per image |
+
+### Network Volume Setup (One-Time)
+
+1. **Create the volume** in [RunPod Console](https://www.runpod.io/console/user/storage):
+   - Click **Network Volumes** → **New Network Volume**
+   - **Name:** `manga-translator-models`
+   - **Region:** Must match your endpoint region (e.g., `US-TX-3`)
+   - **Size:** 20 GB (models are ~5-8 GB, leaves room for growth)
+
+2. **Attach to your serverless endpoint:**
+   - Go to **Serverless** → your endpoint → **Edit Template**
+   - Under **Network Volume**, select the volume you just created
+   - The volume mounts at `/runpod-volume` automatically
+
+3. **Deploy** — push to `main` or manually trigger the deploy workflow. On first worker boot:
+   - Logs will show `Using network volume for models: /app/models -> /runpod-volume/models`
+   - Then `Downloading model: ...` for each model (one-time)
+   - Subsequent boots will show `Model already cached: ...`
+
+4. **Verify** the volume is working:
+   ```bash
+   # Check RunPod logs for the first cold start
+   # You should see:
+   #   INFO - Using network volume for models: /app/models -> /runpod-volume/models
+   #   INFO - Downloading model: default
+   #   ...
+   #   INFO - All models ready.
+   #   INFO - Initializing MangaTranslator (cold start)...
+   ```
+
+### Troubleshooting
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| `No network volume found, using local models` | Volume not attached to endpoint template | Attach volume in RunPod Console → endpoint → Edit Template |
+| Models re-download every cold start | Volume region doesn't match endpoint region | Recreate volume in the same region as your endpoint |
+| `Failed to download model X` | Network issue during first boot | Worker will retry on next cold start; already-downloaded models are retained |
+| Slow first boot (~10 min) | Expected — one-time model download to volume | Subsequent boots will be fast (~30-60s) |
 
 ---
 
