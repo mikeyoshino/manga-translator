@@ -17,6 +17,7 @@ import io
 import json
 import logging
 import os
+import shutil
 import sys
 import traceback
 
@@ -34,6 +35,47 @@ from PIL import Image
 from manga_translator import Config, MangaTranslator
 from server.to_json import to_translation
 from server.smart_routing import apply_smart_routing
+
+# --- Network Volume setup ---
+VOLUME_PATH = "/runpod-volume"
+VOLUME_MODELS = os.path.join(VOLUME_PATH, "models")
+APP_MODELS = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "models"))
+
+if os.path.isdir(VOLUME_PATH):
+    os.makedirs(VOLUME_MODELS, exist_ok=True)
+    if os.path.islink(APP_MODELS):
+        os.unlink(APP_MODELS)
+    elif os.path.isdir(APP_MODELS):
+        shutil.rmtree(APP_MODELS)
+    os.symlink(VOLUME_MODELS, APP_MODELS)
+    logger.info("Using network volume for models: %s -> %s", APP_MODELS, VOLUME_MODELS)
+else:
+    logger.info("No network volume found, using local models at %s", APP_MODELS)
+
+
+async def _ensure_models():
+    """Download any missing models to the volume (no-op if already cached)."""
+    from manga_translator.utils import ModelWrapper
+    from manga_translator.detection import DETECTORS
+    from manga_translator.ocr import OCRS
+    from manga_translator.inpainting import INPAINTERS
+
+    for name, cls in {**DETECTORS, **OCRS, **INPAINTERS}.items():
+        if issubclass(cls, ModelWrapper):
+            try:
+                inst = cls()
+                if not inst.is_downloaded():
+                    logger.info("Downloading model: %s", name)
+                    await inst.download()
+                else:
+                    logger.info("Model already cached: %s", name)
+            except Exception as e:
+                logger.warning("Failed to download model %s: %s", name, e)
+
+
+logger.info("Ensuring models are available...")
+asyncio.run(_ensure_models())
+logger.info("All models ready.")
 
 # --- Load translator once at cold start ---
 logger.info("Initializing MangaTranslator (cold start)...")
@@ -95,7 +137,7 @@ async def handle_inpaint(inp: dict) -> dict:
 
 async def handler(event: dict) -> dict:
     """
-    RunPod async handler function.
+    RunPod async handler function with mode dispatch.
 
     Dispatches on event["input"]["action"]:
       - "translate" (default): full translation pipeline
