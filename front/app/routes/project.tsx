@@ -22,6 +22,7 @@ import {
   CreditCard,
   BarChart3,
   LogOut,
+  Info,
 } from "lucide-react";
 import {
   type StatusKey,
@@ -68,6 +69,7 @@ const t = {
     runTranslation: "เริ่มแปล",
     dropTitle: "วางหน้ามังงะที่นี่",
     dropDesc: "รองรับอัปโหลดหลายไฟล์และ Ctrl+V วาง",
+    dropHint: "การอัพรูปหลายๆ รูปพร้อมกัน ช่วยให้ AI เข้าใจบริบทของเนื้อหาได้ดีขึ้นและแปลได้แม่นยำยิ่งขึ้น",
     queue: "คิว",
     ready: "พร้อม",
     uploaded: "อัปโหลดแล้ว",
@@ -119,6 +121,7 @@ const t = {
     runTranslation: "Run Translation",
     dropTitle: "Drop your manga pages here",
     dropDesc: "Supports batch upload and Ctrl+V clipboard paste",
+    dropHint: "Uploading multiple images together helps AI understand context better and translate more accurately",
     queue: "Queue",
     ready: "ready",
     uploaded: "Uploaded",
@@ -550,6 +553,10 @@ function ProjectContent() {
                 <p className="text-sm font-bold text-slate-700">{uploading ? i.uploading : i.dropTitle}</p>
                 <p className="text-xs text-slate-400 mt-1">{i.dropDesc}</p>
               </div>
+              <div className="mt-3 inline-flex items-center gap-2 bg-indigo-50 text-indigo-600 text-xs px-4 py-2 rounded-full">
+                <Info className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{i.dropHint}</span>
+              </div>
             </div>
           </div>
 
@@ -580,7 +587,7 @@ function ProjectContent() {
                             badge.status && processingStatuses.includes(badge.status as any) ? "bg-indigo-100 text-indigo-600" :
                             "bg-slate-100 text-slate-500"
                           }`}>
-                            {badge.status || pi.status}
+                            {badge.status && processingStatuses.includes(badge.status as any) ? "pending" : (badge.status || pi.status)}
                           </span>
                         </div>
                         <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
