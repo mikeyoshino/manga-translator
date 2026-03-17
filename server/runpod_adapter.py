@@ -53,6 +53,29 @@ async def submit_job(image_b64: str, config_json: str) -> str:
         return job_id
 
 
+async def submit_inpaint_job(image_b64: str, mask_b64: str, inpainting_size: int = 2048) -> str:
+    """Submit an inpaint job to RunPod. Returns the RunPod job ID."""
+    payload = {
+        "input": {
+            "action": "inpaint",
+            "image_b64": image_b64,
+            "mask_b64": mask_b64,
+            "inpainting_size": inpainting_size,
+        }
+    }
+    async with _client() as client:
+        resp = await client.post(
+            f"{RUNPOD_BASE_URL}/run",
+            headers=_headers(),
+            json=payload,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        job_id = data["id"]
+        logger.info("Submitted RunPod inpaint job %s", job_id)
+        return job_id
+
+
 async def poll_job(job_id: str, timeout: float = 600) -> dict:
     """
     Poll RunPod for job completion with exponential backoff.
