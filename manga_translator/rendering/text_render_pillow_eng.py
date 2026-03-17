@@ -7,6 +7,37 @@ from .ballon_extractor import extract_ballon_region
 from ..utils import TextBlock
 from .text_render_eng import seg_eng
 
+def _seg_thai(text: str) -> List[str]:
+    """Segment Thai text into words using pythainlp, fallback to character-level."""
+    try:
+        from pythainlp.tokenize import word_tokenize
+        return word_tokenize(text.strip())
+    except ImportError:
+        return list(text.strip())
+
+
+def merge_seg_thai(text: str, font, bbox_width, size_ratio=1.2) -> List[str]:
+    """Segments Thai text into lines that fit within bbox_width."""
+    words = _seg_thai(text)
+    if not words:
+        return []
+    lines = []
+    current_line = ''
+    max_width = max(bbox_width, font.size * 2) * size_ratio
+    for word in words:
+        test_line = current_line + word
+        width = font.getbbox(test_line)[2] - font.getbbox(test_line)[0]
+        if width <= max_width:
+            current_line = test_line
+        else:
+            if current_line:
+                lines.append(current_line)
+            current_line = word
+    if current_line:
+        lines.append(current_line)
+    return lines
+
+
 def merge_seg_eng(text: str, font, bbox_width, size_ratio=1.2) -> List[str]:
     """Segments text into words that fit within bbox_width"""
     grouped = seg_eng(text)
@@ -148,11 +179,14 @@ def render_textblock_list_eng(
         if isinstance(xyxy, tuple):
             xyxy = list(xyxy)
         font = ImageFont.truetype(font_path, font_size)
-        words = merge_seg_eng(region.translation, font, region.xywh[2])
+        is_thai = getattr(region, 'target_lang', '') == 'THA'
+        _merge_seg = merge_seg_thai if is_thai else merge_seg_eng
+        words = _merge_seg(region.translation, font, region.xywh[2])
         if not words:
             continue
 
-        sw, line_height, delimiter_len, base_length, word_lengths = calculate_font_values(font, words)
+        delimiter = '' if is_thai else ' '
+        sw, line_height, delimiter_len, base_length, word_lengths = calculate_font_values(font, words, delimiter)
         ballon_area = (ballon_mask > 0).sum()
         rx, ry = 0, 0
 
@@ -195,8 +229,8 @@ def render_textblock_list_eng(
                 if font_size_multiplier < 1:
                     font_size = int(font_size * font_size_multiplier)
                     font = ImageFont.truetype(font_path, font_size)
-                    words = merge_seg_eng(region.translation, font, region.xywh[2])
-                    sw, line_height, delimiter_len, base_length, word_lengths = calculate_font_values(font, words)
+                    words = _merge_seg(region.translation, font, region.xywh[2])
+                    sw, line_height, delimiter_len, base_length, word_lengths = calculate_font_values(font, words, delimiter)
 
         # Create text layer
         bbox_center_x, bbox_center_y = (xyxy[0] + xyxy[2]) / 2, (xyxy[1] + xyxy[3]) / 2
