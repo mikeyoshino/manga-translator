@@ -272,16 +272,44 @@ async def inpaint(
     user: AuthUser = Depends(get_current_user),
 ) -> StreamingResponse:
     """Run AI inpainting: remove masked regions and fill with background."""
+    import logging
+    import sentry_sdk
+    logger = logging.getLogger(__name__)
+
     if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="inpaint", channel="api"):
         raise HTTPException(status_code=402, detail="Insufficient tokens")
 
+    img_bytes = await image.read()
+    mask_bytes = await mask.read()
+
+    if WORKER_MODE == "runpod":
+        # Route inpaint through RunPod GPU worker
+        from server.runpod_adapter import submit_inpaint_job, poll_job, image_bytes_to_b64
+        import base64 as b64mod
+
+        image_b64 = image_bytes_to_b64(img_bytes)
+        mask_b64 = image_bytes_to_b64(mask_bytes)
+
+        logger.info("Submitting inpaint job to RunPod (size=%d)", inpainting_size)
+        try:
+            job_id = await submit_inpaint_job(image_b64, mask_b64, inpainting_size)
+            result = await poll_job(job_id)
+        except Exception as e:
+            logger.error("RunPod inpaint failed: %s", e, exc_info=True)
+            sentry_sdk.capture_exception(e)
+            raise HTTPException(status_code=500, detail=f"Inpainting failed: {e}")
+
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=f"Inpainting failed: {result['error']}")
+
+        result_bytes = b64mod.b64decode(result["image_b64"])
+        return StreamingResponse(io.BytesIO(result_bytes), media_type="image/png")
+
+    # Local / Redis mode — run inference directly
     import cv2
     import numpy as np
     from manga_translator.inpainting import dispatch as dispatch_inpainting
     from manga_translator.config import Inpainter, InpainterConfig
-
-    img_bytes = await image.read()
-    mask_bytes = await mask.read()
 
     img_arr = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_COLOR)
     if img_arr is None:
@@ -294,10 +322,6 @@ async def inpaint(
 
     if mask_arr.shape[:2] != img_rgb.shape[:2]:
         mask_arr = cv2.resize(mask_arr, (img_rgb.shape[1], img_rgb.shape[0]), interpolation=cv2.INTER_NEAREST)
-
-    import logging
-    import sentry_sdk
-    logger = logging.getLogger(__name__)
 
     device = _get_inpaint_device()
     logger.info("Inpaint request: image=%s mask=%s size=%d device=%s",

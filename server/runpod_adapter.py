@@ -103,6 +103,29 @@ async def check_health() -> dict:
             return {"status": "error", "detail": str(e)}
 
 
+async def submit_inpaint_job(image_b64: str, mask_b64: str, inpainting_size: int = 2048) -> str:
+    """Submit an inpaint job to RunPod. Returns the RunPod job ID."""
+    payload = {
+        "input": {
+            "mode": "inpaint",
+            "image_b64": image_b64,
+            "mask_b64": mask_b64,
+            "inpainting_size": inpainting_size,
+        }
+    }
+    async with _client() as client:
+        resp = await client.post(
+            f"{RUNPOD_BASE_URL}/run",
+            headers=_headers(),
+            json=payload,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        job_id = data["id"]
+        logger.info("Submitted RunPod inpaint job %s", job_id)
+        return job_id
+
+
 def image_bytes_to_b64(image_bytes: bytes) -> str:
     """Encode raw image bytes to base64 string."""
     return base64.b64encode(image_bytes).decode("utf-8")
