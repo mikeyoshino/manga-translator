@@ -295,10 +295,21 @@ async def inpaint(
     if mask_arr.shape[:2] != img_rgb.shape[:2]:
         mask_arr = cv2.resize(mask_arr, (img_rgb.shape[1], img_rgb.shape[0]), interpolation=cv2.INTER_NEAREST)
 
+    import logging
+    import sentry_sdk
+    logger = logging.getLogger(__name__)
+
     device = _get_inpaint_device()
-    result = await dispatch_inpainting(
-        Inpainter.lama_large, img_rgb, mask_arr, InpainterConfig(), inpainting_size, device
-    )
+    logger.info("Inpaint request: image=%s mask=%s size=%d device=%s",
+                img_rgb.shape, mask_arr.shape, inpainting_size, device)
+    try:
+        result = await dispatch_inpainting(
+            Inpainter.lama_large, img_rgb, mask_arr, InpainterConfig(), inpainting_size, device
+        )
+    except Exception as e:
+        logger.error("Inpaint failed: %s", e, exc_info=True)
+        sentry_sdk.capture_exception(e)
+        raise HTTPException(status_code=500, detail=f"Inpainting failed: {e}")
 
     result_bgr = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
     _, png_data = cv2.imencode(".png", result_bgr)

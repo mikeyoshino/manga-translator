@@ -247,6 +247,9 @@ jobs:
             if [ -n "$PULL_SERVICES" ]; then
               docker compose -f docker-compose.prod.yml pull $PULL_SERVICES
               docker compose -f docker-compose.prod.yml up -d --force-recreate $PULL_SERVICES
+
+              # Restart nginx so it resolves the new container IPs
+              docker compose -f docker-compose.prod.yml restart nginx
             fi
 
             # Clean up old images

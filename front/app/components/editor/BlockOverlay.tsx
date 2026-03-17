@@ -9,6 +9,7 @@ interface BlockOverlayProps {
   block: EditableBlock;
   isSelected: boolean;
   isEditing?: boolean;
+  interactive?: boolean;
   onSelect: () => void;
   onDblClick: () => void;
   onDragEnd: (x: number, y: number) => void;
@@ -19,6 +20,7 @@ export function BlockOverlay({
   block,
   isSelected,
   isEditing,
+  interactive = true,
   onSelect,
   onDblClick,
   onDragEnd,
@@ -185,7 +187,8 @@ export function BlockOverlay({
         width={block.editedWidth}
         height={block.editedHeight}
         fill="transparent"
-        draggable
+        draggable={interactive}
+        listening={interactive}
         onClick={onSelect}
         onTap={onSelect}
         onDblClick={onDblClick}
@@ -204,7 +207,7 @@ export function BlockOverlay({
           listening={false}
         />
       )}
-      {isSelected && (
+      {isSelected && interactive && (
         <Transformer
           ref={trRef}
           rotateEnabled={false}
