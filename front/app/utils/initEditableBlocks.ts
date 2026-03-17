@@ -1,5 +1,6 @@
 import type { TranslationBlock, EditableBlock } from "@/types";
 import { getFontForLang } from "./fontMap";
+import { segmentWords } from "./textSegment";
 
 // Map config language codes to full names used by the translation backend
 const LANG_CODE_TO_NAME: Record<string, string> = {
@@ -56,6 +57,53 @@ function findTranslatedText(
   return values[values.length - 1] ?? "";
 }
 
+/**
+ * Shrink font size until the translated text fits within the given dimensions.
+ * Uses canvas measureText + word-wrap simulation to estimate line count.
+ */
+function autoFitFontSize(
+  text: string,
+  width: number,
+  height: number,
+  startSize: number,
+  fontFamily: string,
+  lineSpacing: number = 1.5,
+  minSize: number = 8
+): number {
+  if (typeof document === "undefined" || !text) return startSize;
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return startSize;
+
+  let fontSize = startSize;
+
+  while (fontSize > minSize) {
+    ctx.font = `${fontSize}px "${fontFamily}"`;
+    const words = segmentWords(text);
+    let lines = 1;
+    let currentLineWidth = 0;
+
+    for (const word of words) {
+      const wordWidth = ctx.measureText(word).width;
+      if (currentLineWidth + wordWidth > width && currentLineWidth > 0) {
+        lines++;
+        currentLineWidth = word.trim() === "" ? 0 : wordWidth;
+      } else {
+        currentLineWidth += wordWidth;
+      }
+    }
+
+    const totalHeight = lines * fontSize * lineSpacing;
+    if (totalHeight <= height) break;
+    fontSize -= 1;
+  }
+
+  canvas.width = 0;
+  canvas.height = 0;
+  return Math.max(fontSize, minSize);
+}
+
 export function initEditableBlocks(
   blocks: TranslationBlock[],
   targetLang: string
@@ -76,7 +124,13 @@ export function initEditableBlocks(
       editedY: block.minY,
       editedWidth: block.maxX - block.minX,
       editedHeight: block.maxY - block.minY,
-      editedFontSize: block.font_size > 0 ? block.font_size : 24,
+      editedFontSize: autoFitFontSize(
+        translatedText,
+        block.maxX - block.minX,
+        block.maxY - block.minY,
+        block.font_size > 0 ? block.font_size : 24,
+        getFontForLang(targetLang || block.target_lang)
+      ),
       editedFontFamily: getFontForLang(targetLang || block.target_lang),
       editedColor: rgbToHex(fr, fg, fb),
       editedLetterSpacing: block.letter_spacing,

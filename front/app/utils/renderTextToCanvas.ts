@@ -3,6 +3,8 @@
  * text shaping, which correctly handles Thai combining characters (e.g. สำ).
  * Returns the canvas element for use as a Konva Image source.
  */
+import { segmentGraphemes, segmentWords } from "./textSegment";
+
 export interface TextRenderOptions {
   text: string;
   width: number;
@@ -19,28 +21,6 @@ export interface TextRenderOptions {
   strokeWidth: number;
 }
 
-// Cache Intl.Segmenter instances
-let _graphemeSegmenter: any | null = null;
-function getGraphemeSegmenter() {
-  if (_graphemeSegmenter) return _graphemeSegmenter;
-  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
-    _graphemeSegmenter = new (Intl as any).Segmenter(undefined, {
-      granularity: "grapheme",
-    });
-  }
-  return _graphemeSegmenter;
-}
-
-let _wordSegmenter: any | null = null;
-function getWordSegmenter() {
-  if (_wordSegmenter) return _wordSegmenter;
-  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
-    _wordSegmenter = new (Intl as any).Segmenter("th", {
-      granularity: "word",
-    });
-  }
-  return _wordSegmenter;
-}
 
 /**
  * Release a canvas's backing bitmap memory.
@@ -175,21 +155,6 @@ function drawTextWithSpacing(
   }
 }
 
-function segmentGraphemes(text: string): string[] {
-  const segmenter = getGraphemeSegmenter();
-  if (segmenter) {
-    return Array.from(segmenter.segment(text), (s: any) => s.segment);
-  }
-  return [...text];
-}
-
-function segmentWords(text: string): string[] {
-  const segmenter = getWordSegmenter();
-  if (segmenter) {
-    return Array.from(segmenter.segment(text), (s: any) => s.segment);
-  }
-  return text.split(/(\s+)/);
-}
 
 function measureWithSpacing(
   ctx: CanvasRenderingContext2D,
