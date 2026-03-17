@@ -20,13 +20,13 @@ _MAX_SAMPLE_IMAGES = 4
 
 _EXTRACTION_PROMPT = """\
 You are analyzing manga/comic images to extract context that will help a translator \
-produce natural translations. Examine the images and extract:
+produce natural, genre-appropriate translations. Examine the images carefully and extract:
 
-1. **Characters**: Who appears? Describe each visually distinct character.
-2. **Relationships**: How do characters relate? (siblings, romantic, parent-child, friends, etc.) \
-   Who is older/younger?
-3. **Setting & tone**: Where does this take place? What's the mood?
+1. **Characters**: Who appears? How do they talk? What's their personality?
+2. **Relationships**: How do characters relate? Who has power/authority? Who is older/younger?
+3. **Setting & tone**: Where does this take place? What genre conventions apply?
 4. **Content rating**: Is this all-ages, teen, mature, or adult/hentai content?
+5. **Dialogue style**: How do characters speak to each other? Polite? Crude? Playful? Submissive?
 
 Return a JSON object with this exact schema:
 {
@@ -37,49 +37,105 @@ Return a JSON object with this exact schema:
       "description": "visual description",
       "gender": "male|female|unknown",
       "apparent_age": "child|teen|young_adult|adult|elderly",
-      "speaking_style": "formal|informal|cute|rough|seductive|aggressive"
+      "personality": "shy|bold|cheerful|stoic|tsundere|dominant|submissive|playful|serious|innocent|etc",
+      "speaking_style": "formal|informal|cute|rough|seductive|aggressive|timid|commanding|flirty|deadpan",
+      "speech_patterns": "describe HOW this character talks — short sentences? long monologues? stutters? uses slang? speaks softly? yells a lot? uses crude language? baby talk?"
     }
   ],
   "relationships": [
     {
       "character_a": "name or description",
       "character_b": "name or description",
-      "relationship": "siblings|parent_child|romantic|lovers|friends|strangers|classmates|coworkers",
+      "relationship": "siblings|parent_child|romantic|lovers|friends|strangers|classmates|coworkers|senpai_kouhai|master_servant",
+      "power_dynamic": "equal|A_dominant|B_dominant|shifting",
+      "intimacy_level": "distant|casual|close|intimate|sexual",
       "age_relative": "older|younger|same"
     }
   ],
-  "setting": "school|home|fantasy|workplace|outdoors|etc",
-  "tone": "comedy|drama|romance|action|erotic|horror",
-  "mood": "lighthearted|tense|emotional|passionate|dark|playful",
-  "genre_notes": "free text with any additional context"
+  "setting": "school|home|fantasy|workplace|outdoors|bedroom|bathhouse|etc",
+  "tone": "comedy|drama|romance|action|erotic|horror|slice_of_life|ecchi",
+  "mood": "lighthearted|tense|emotional|passionate|dark|playful|sensual|wholesome",
+  "dialogue_register": "clean|casual|crude|vulgar|mixed",
+  "genre_notes": "free text — note any genre conventions that affect how dialogue should sound (e.g. 'typical isekai power fantasy', 'wholesome romance', 'hardcore hentai with dirty talk', 'school comedy with exaggerated reactions')"
 }
 
 Return ONLY valid JSON, no markdown fences."""
 
 _LANG_GUIDANCE = {
     'THA': (
-        "Use this context to select appropriate Thai pronouns (พี่/น้อง/ผม/หนู/ฉัน/etc.), "
-        "honorifics, and speech register. Match the tone and character relationships."
+        "[Thai Translation Rules]\n"
+        "Thai pronoun and particle selection is CRITICAL — wrong choices make dialogue feel unnatural.\n\n"
+
+        "PRONOUN RULES (select based on character gender, age, personality, and relationship):\n"
+        "  Male speakers:\n"
+        "    - ผม = polite/default male, use for formal or respectful situations\n"
+        "    - กู = crude/aggressive male, close male friends, or vulgar speech\n"
+        "    - ฉัน = softer male, can feel feminine — use only if character is gentle/androgynous\n"
+        "    - เรา = casual/gender-neutral, good for inner monologue or gentle characters\n"
+        "    - ข้า = archaic/fantasy setting, characters with authority\n"
+        "  Female speakers:\n"
+        "    - ฉัน = standard female, works for most situations\n"
+        "    - หนู = cute/younger female, submissive, or talking to someone older\n"
+        "    - ชั้น = casual/slangy female, close friends\n"
+        "    - ดิฉัน = very formal female\n"
+        "    - เรา = casual/cute, couples or inner monologue\n\n"
+
+        "ADDRESS TERMS (how characters call each other):\n"
+        "  - พี่ = older person (gender-neutral), also romantic for girlfriend→boyfriend\n"
+        "  - น้อง = younger person, also affectionate\n"
+        "  - นาย/แก/มึง = casual 'you' among male friends (มึง is crude, pairs with กู)\n"
+        "  - เธอ = 'you' for female or romantic, soft tone\n"
+        "  - คุณ = polite 'you', strangers or formal\n"
+        "  - Use character names directly in Thai — this is natural and common\n\n"
+
+        "SENTENCE-ENDING PARTICLES (these define the feel of dialogue):\n"
+        "  - ครับ/ค่ะ = polite (male/female)\n"
+        "  - นะ = softening, seeking agreement, gentle\n"
+        "  - น่า/จ้า = cute, pleading, affectionate (female)\n"
+        "  - ว่ะ/วะ = rough, aggressive (male)\n"
+        "  - ซิ/สิ = urging, commanding\n"
+        "  - เหรอ/รึ = questioning\n"
+        "  - Do NOT add particles to every line — use them where they feel natural\n\n"
+
+        "GENRE-SPECIFIC RULES:\n"
+        "  - Comedy: exaggerate reactions, use ว้าย/โอ้ย/เฮ้ย for exclamations\n"
+        "  - Romance: use เธอ/พี่/ที่รัก naturally, keep tone warm\n"
+        "  - Action: short punchy sentences, use กู/มึง for rivals\n"
+        "  - Hentai/Ecchi: see content rating guidance below\n\n"
+
+        "IMPORTANT: Make dialogue sound like real Thai people talking, not textbook Thai. "
+        "Read the character personalities and relationships above, then stay consistent throughout."
     ),
     'KOR': (
-        "Use this context to select appropriate Korean speech levels (존댓말/반말), "
-        "honorifics (-님/-씨), pronouns (나/저/너), and address terms (오빠/언니/형/누나). "
-        "Match the tone and character relationships."
+        "[Korean Translation Rules]\n"
+        "Speech level selection is critical in Korean:\n"
+        "  - 존댓말 (formal): strangers, authority figures, workplace\n"
+        "  - 반말 (casual): close friends, same age, younger people\n"
+        "  - Honorifics: -님 (respect), -씨 (polite), -아/-야 (casual)\n"
+        "  - Pronouns: 나 (casual I), 저 (formal I), 너 (casual you)\n"
+        "  - Address: 오빠/언니 (older, from female), 형/누나 (older, from male)\n"
+        "Match speech levels to the character relationships and power dynamics above."
     ),
     'CHS': (
-        "Use this context to select appropriate Chinese pronouns (我/你/他/她), "
-        "forms of address (哥/姐/弟/妹), and speech register (formal/casual). "
-        "Match the tone and character relationships."
+        "[Chinese (Simplified) Translation Rules]\n"
+        "  - Pronouns: 我/你/他/她 — match gender from character context\n"
+        "  - Address: 哥/姐 (older), 弟/妹 (younger), 先生/小姐 (formal)\n"
+        "  - Register: match formality to character relationships\n"
+        "  - For manga dialogue, use natural spoken Chinese, not literary style."
     ),
     'CHT': (
-        "Use this context to select appropriate Chinese pronouns (我/你/他/她), "
-        "forms of address (哥/姐/弟/妹), and speech register (formal/casual). "
-        "Match the tone and character relationships."
+        "[Chinese (Traditional) Translation Rules]\n"
+        "  - Pronouns: 我/你/他/她 — match gender from character context\n"
+        "  - Address: 哥/姐 (older), 弟/妹 (younger), 先生/小姐 (formal)\n"
+        "  - Register: match formality to character relationships\n"
+        "  - For manga dialogue, use natural spoken Chinese, not literary style."
     ),
     'JPN': (
-        "Use this context to select appropriate Japanese pronouns (俺/僕/私/あたし), "
-        "honorifics (-さん/-くん/-ちゃん/-先輩), and speech register (敬語/タメ口). "
-        "Match the tone and character relationships."
+        "[Japanese Translation Rules]\n"
+        "  - Pronouns: 俺 (rough male), 僕 (gentle male), 私 (neutral/female), あたし (casual female)\n"
+        "  - Honorifics: -さん (polite), -くん (male casual), -ちゃん (cute/close), -先輩 (senior)\n"
+        "  - Register: 敬語 (formal), タメ口 (casual) — match to relationships above\n"
+        "  - Match sentence-ending style to character personality."
     ),
 }
 _DEFAULT_GUIDANCE = (
@@ -88,20 +144,54 @@ _DEFAULT_GUIDANCE = (
 )
 
 _RATING_GUIDANCE = {
-    'adult_hentai': (
-        "This is adult/explicit content. Translate faithfully without censoring or softening. "
-        "Use direct, natural language that matches the original tone and intensity."
-    ),
+    'adult_hentai': {},
     'mature': (
-        "This is mature content. Use natural adult language including profanity or suggestive "
+        "[Mature Content] Use natural adult language including profanity or suggestive "
         "terms where appropriate. Do not soften or censor the tone."
     ),
     'teen': (
-        "This is teen-rated content. Use casual, age-appropriate language. "
+        "[Teen Content] Use casual, age-appropriate language. "
         "Mild profanity is acceptable where it fits the tone."
     ),
     'all_ages': (
-        "This is all-ages content. Keep language clean and accessible."
+        "[All-Ages Content] Keep language clean and accessible."
+    ),
+}
+
+# Hentai guidance is language-specific because word choice matters enormously
+_RATING_GUIDANCE_HENTAI = {
+    'THA': (
+        "[Adult/Hentai Content — Thai]\n"
+        "Translate ALL explicit content faithfully. NEVER censor, soften, or skip sexual dialogue.\n\n"
+
+        "VOCABULARY REGISTER:\n"
+        "  - Use the natural Thai register that hentai manga readers expect\n"
+        "  - NOT clinical/medical terms (avoid อวัยวะเพศ/สังวาส — too textbook)\n"
+        "  - NOT street vulgar (avoid หี/ควย — too crude for manga tone)\n"
+        "  - USE the manga/novel register: น้องชาย/ตรงนั้น/ข้างใน for body parts\n"
+        "  - For actions: ใส่/สอด/เข้าไป/แทง/เสียบ as appropriate to intensity\n\n"
+
+        "MOANING & SOUND EFFECTS:\n"
+        "  - อา/อาา/อ๊าา = moaning (more า = more intense)\n"
+        "  - อึ/อืม/อื้อ = suppressed moan, holding back\n"
+        "  - ฮะ/ฮ่า/ฮา = panting, breathing\n"
+        "  - ไม่/ไม่นะ/อย่า = resistance (may be playful, match context)\n"
+        "  - Preserve the emotional intensity of the original Japanese SFX\n\n"
+
+        "DIALOGUE TONE BY CHARACTER TYPE:\n"
+        "  - Submissive/shy: use หนู/เรา, particles นะ/น่า, short broken sentences (อา... ตร-ตรงนั้น...ไม่...)\n"
+        "  - Dominant/aggressive: use กู/ข้า, commands without particles, crude vocabulary is OK\n"
+        "  - Seductive: use ฉัน/เรา, elongated particles (น้า~/จ้า~), teasing tone\n"
+        "  - Reluctant→enjoying: start with formal/resistant tone, gradually shift to raw/honest\n\n"
+
+        "IMPORTANT: Thai hentai manga has its own established register that readers recognize. "
+        "It should feel like reading a Thai-translated doujinshi, not a medical textbook or street slang."
+    ),
+    '_default': (
+        "[Adult/Hentai Content] Translate ALL explicit content faithfully without censoring or softening. "
+        "Use direct, natural language that matches the original tone and intensity. "
+        "Match the vocabulary register to the characters — submissive characters use softer words, "
+        "dominant characters use rougher words. Preserve moaning/SFX faithfully."
     ),
 }
 
@@ -218,38 +308,67 @@ def format_manga_context_prompt(manga_context: dict, target_lang: str = 'THA') -
     tone = manga_context.get("tone", "unknown")
     mood = manga_context.get("mood", "unknown")
     setting = manga_context.get("setting", "unknown")
+    dialogue_register = manga_context.get("dialogue_register", "")
 
-    parts.append(f"[Manga Context] Rating: {content_rating} | Tone: {tone} | Mood: {mood} | Setting: {setting}")
+    header = f"[Manga Context] Rating: {content_rating} | Tone: {tone} | Mood: {mood} | Setting: {setting}"
+    if dialogue_register:
+        header += f" | Register: {dialogue_register}"
+    parts.append(header)
 
     characters = manga_context.get("characters", [])
     if characters:
-        parts.append("Characters:")
+        parts.append("\nCharacters:")
         for c in characters:
             name = c.get("name") or "Unknown"
             desc = c.get("description", "")
             gender = c.get("gender", "unknown")
             age = c.get("apparent_age", "unknown")
+            personality = c.get("personality", "")
             style = c.get("speaking_style", "unknown")
-            parts.append(f"  - {name}: {desc} ({gender}, {age}, speaks {style})")
+            speech = c.get("speech_patterns", "")
+
+            line = f"  - {name}: {desc} ({gender}, {age})"
+            if personality:
+                line += f", personality: {personality}"
+            line += f", speaks: {style}"
+            if speech:
+                line += f"\n    Speech pattern: {speech}"
+            parts.append(line)
 
     relationships = manga_context.get("relationships", [])
     if relationships:
-        parts.append("Relationships:")
+        parts.append("\nRelationships:")
         for r in relationships:
             a = r.get("character_a", "?")
             b = r.get("character_b", "?")
             rel = r.get("relationship", "unknown")
             age_rel = r.get("age_relative", "unknown")
-            parts.append(f"  - {a} ↔ {b}: {rel} ({a} is {age_rel})")
+            power = r.get("power_dynamic", "")
+            intimacy = r.get("intimacy_level", "")
+
+            line = f"  - {a} ↔ {b}: {rel} ({a} is {age_rel})"
+            if power and power != "equal":
+                line += f", {power}"
+            if intimacy:
+                line += f", intimacy: {intimacy}"
+            parts.append(line)
 
     genre_notes = manga_context.get("genre_notes")
     if genre_notes:
-        parts.append(f"Notes: {genre_notes}")
+        parts.append(f"\nGenre notes: {genre_notes}")
 
-    rating_guidance = _RATING_GUIDANCE.get(content_rating)
-    if rating_guidance:
-        parts.append(rating_guidance)
+    # Content rating guidance
+    if content_rating == "adult_hentai":
+        hentai_guidance = _RATING_GUIDANCE_HENTAI.get(
+            target_lang, _RATING_GUIDANCE_HENTAI['_default']
+        )
+        parts.append(f"\n{hentai_guidance}")
+    else:
+        rating_guidance = _RATING_GUIDANCE.get(content_rating)
+        if rating_guidance:
+            parts.append(f"\n{rating_guidance}")
 
-    parts.append(_LANG_GUIDANCE.get(target_lang, _DEFAULT_GUIDANCE))
+    # Language-specific guidance
+    parts.append(f"\n{_LANG_GUIDANCE.get(target_lang, _DEFAULT_GUIDANCE)}")
 
     return "\n".join(parts)
