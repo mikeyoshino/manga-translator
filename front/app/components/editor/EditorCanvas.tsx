@@ -268,6 +268,7 @@ export function EditorCanvas() {
             <BlockOverlay
               key={block.id}
               block={block}
+              interactive={!isDrawingTool}
               isSelected={block.id === selectedBlockId}
               isEditing={inlineEdit?.blockId === block.id}
               onSelect={() => {

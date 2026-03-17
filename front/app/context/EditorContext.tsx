@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useRef } from 
 import type { EditorImage, EditableBlock, EditorAction, ImageHistory } from "@/types";
 import { createEmptyHistory, pushToHistory } from "@/types";
 import { useAuth } from "@/context/AuthContext";
+import Sentry from "@/lib/sentry";
 
 export interface DrawingLine {
   points: number[];
@@ -67,6 +68,13 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   const saveTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const imagesRef = useRef<EditorImage[]>([]);
   imagesRef.current = images;
+  const pendingActionRef = useRef<{
+    imageId: string;
+    blockId: string;
+    before: Partial<EditableBlock>;
+    after: Partial<EditableBlock>;
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
 
   const currentImage = images[currentImageIndex] ?? null;
 
@@ -84,6 +92,22 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, []);
+
+  // Flush any pending coalesced block-update action to history
+  const flushPendingAction = useCallback(() => {
+    const pending = pendingActionRef.current;
+    if (pending) {
+      clearTimeout(pending.timer);
+      pushAction({
+        type: "block-update",
+        imageId: pending.imageId,
+        blockId: pending.blockId,
+        before: pending.before,
+        after: pending.after,
+      });
+      pendingActionRef.current = null;
+    }
+  }, [pushAction]);
 
   const setActiveTool = useCallback((tool: ActiveTool) => {
     setActiveToolRaw(tool);
@@ -132,30 +156,46 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     [session?.access_token]
   );
 
-  // Public updateBlock - captures before/after diff and pushes to history
+  // Public updateBlock - coalesces rapid edits to the same block into a single history entry
   const updateBlock = useCallback(
     (imageId: string, blockId: string, updates: Partial<EditableBlock>) => {
-      // Capture "before" state from ref to avoid stale closures
-      const img = imagesRef.current.find((im) => im.id === imageId);
-      if (img) {
-        const block = img.editableBlocks.find((b) => b.id === blockId);
-        if (block) {
-          const before: Partial<EditableBlock> = {};
-          for (const key of Object.keys(updates) as (keyof EditableBlock)[]) {
-            (before as Record<string, unknown>)[key] = block[key];
+      const pending = pendingActionRef.current;
+
+      if (pending && pending.imageId === imageId && pending.blockId === blockId) {
+        // Same block: merge updates into pending action, keep original "before"
+        clearTimeout(pending.timer);
+        pending.after = { ...pending.after, ...updates };
+        pending.timer = setTimeout(flushPendingAction, 500);
+      } else {
+        // Different block or no pending action: flush old, start new
+        if (pending) {
+          flushPendingAction();
+        }
+
+        // Capture "before" state from ref
+        const img = imagesRef.current.find((im) => im.id === imageId);
+        if (img) {
+          const block = img.editableBlocks.find((b) => b.id === blockId);
+          if (block) {
+            const before: Partial<EditableBlock> = {};
+            for (const key of Object.keys(updates) as (keyof EditableBlock)[]) {
+              (before as Record<string, unknown>)[key] = block[key];
+            }
+            pendingActionRef.current = {
+              imageId,
+              blockId,
+              before,
+              after: { ...updates },
+              timer: setTimeout(flushPendingAction, 500),
+            };
           }
-          pushAction({
-            type: "block-update",
-            imageId,
-            blockId,
-            before,
-            after: updates,
-          });
         }
       }
+
+      // Always update UI immediately
       updateBlockInternal(imageId, blockId, updates);
     },
-    [updateBlockInternal, pushAction]
+    [updateBlockInternal, flushPendingAction]
   );
 
   const addDrawingLine = useCallback((imageId: string, line: DrawingLine) => {
@@ -287,7 +327,11 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         body: fd,
       });
 
-      if (!resp.ok) throw new Error(`Inpaint failed: ${resp.status}`);
+      if (!resp.ok) {
+        let detail = `${resp.status}`;
+        try { const j = await resp.json(); detail = j.detail || detail; } catch {}
+        throw new Error(`Inpaint failed: ${detail}`);
+      }
 
       const resultBlob = await resp.blob();
       const resultUrl = URL.createObjectURL(resultBlob);
@@ -330,6 +374,10 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         next.set(imageId, []);
         return next;
       });
+    } catch (err) {
+      console.error("Magic remover failed:", err);
+      Sentry.captureException(err);
+      alert(err instanceof Error ? err.message : "Inpainting failed");
     } finally {
       setIsInpainting(false);
     }
@@ -468,9 +516,13 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   }, [updateBlockInternal]);
 
   const undo = useCallback(() => {
+    // Flush any in-flight coalesced edits before undoing
+    flushPendingAction();
+
     const img = currentImage;
     if (!img) return;
-    const history = getHistory(img.id);
+    // Re-read history after flush (flush may have pushed a new action)
+    const history = historyMap.get(img.id) || createEmptyHistory();
     if (history.undoStack.length === 0) return;
 
     const action = history.undoStack[history.undoStack.length - 1];
@@ -484,12 +536,15 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
     applyActionInverse(action);
-  }, [currentImage, getHistory, applyActionInverse]);
+  }, [currentImage, historyMap, flushPendingAction, applyActionInverse]);
 
   const redo = useCallback(() => {
+    // Flush any in-flight coalesced edits before redoing
+    flushPendingAction();
+
     const img = currentImage;
     if (!img) return;
-    const history = getHistory(img.id);
+    const history = historyMap.get(img.id) || createEmptyHistory();
     if (history.redoStack.length === 0) return;
 
     const action = history.redoStack[history.redoStack.length - 1];
@@ -503,10 +558,10 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
     applyActionForward(action);
-  }, [currentImage, getHistory, applyActionForward]);
+  }, [currentImage, historyMap, flushPendingAction, applyActionForward]);
 
   const currentHistory = currentImage ? getHistory(currentImage.id) : createEmptyHistory();
-  const canUndo = currentHistory.undoStack.length > 0;
+  const canUndo = currentHistory.undoStack.length > 0 || pendingActionRef.current !== null;
   const canRedo = currentHistory.redoStack.length > 0;
 
   return (
