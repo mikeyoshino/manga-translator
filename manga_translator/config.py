@@ -178,8 +178,8 @@ class RenderConfig(BaseModel):
     """Line spacing is font_size * this value. Default is 0.01 for horizontal text and 0.2 for vertical."""
     font_size: Optional[int] = None
     """Use fixed font size for rendering"""
-    rtl: bool = True
-    """Right-to-left reading order for panel and text_region sorting,"""  
+    rtl: Optional[bool] = None
+    """Right-to-left reading order for panel and text_region sorting. None = auto-detect from target language."""
     _font_color_fg = None
     _font_color_bg = None
     @property
@@ -317,6 +317,25 @@ class OcrConfig(BaseModel):
     """The threshold for ignoring text in non bubble areas, with valid values ranging from 1 to 50, does not ignore others. Recommendation 5 to 10. If it is too low, normal bubble areas may be ignored, and if it is too large, non bubble areas may be considered normal bubbles"""
     prob: float | None = None
     """Minimum probability of a text region to be considered valid. If None, uses the model default."""
+
+def resolve_rtl(render_rtl: Optional[bool], target_lang: str) -> bool:
+    """Resolve the reading order from config and target language.
+
+    If render_rtl is explicitly set (True/False), use that.
+    Otherwise auto-detect from the target language orientation preset.
+    """
+    if render_rtl is not None:
+        return render_rtl
+
+    from manga_translator.utils.textblock import LANGUAGE_ORIENTATION_PRESETS
+    orientation = LANGUAGE_ORIENTATION_PRESETS.get(target_lang, 'h')
+    if orientation == 'hr':
+        return True
+    if orientation == 'h':
+        return False
+    # 'auto' or 'v' — CJK languages, manga convention is RTL
+    return True
+
 
 class Config(BaseModel):
     # General
