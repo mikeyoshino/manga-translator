@@ -14,7 +14,7 @@ from PIL import Image
 from typing import Optional, Any, List
 import py3langid as langid
 
-from .config import Config, Colorizer, Detector, Translator, Renderer, Inpainter
+from .config import Config, Colorizer, Detector, Translator, Renderer, Inpainter, resolve_rtl
 from .utils import (
     BASE_PATH,
     LANGUAGE_ORIENTATION_PRESETS,
@@ -521,7 +521,7 @@ class MangaTranslator:
         if self.verbose and ctx.text_regions:
             show_panels = not config.force_simple_sort  # 当不使用简单排序时显示panel
             bboxes = visualize_textblocks(cv2.cvtColor(ctx.img_rgb, cv2.COLOR_BGR2RGB), ctx.text_regions, 
-                                        show_panels=show_panels, img_rgb=ctx.img_rgb, right_to_left=config.render.rtl)
+                                        show_panels=show_panels, img_rgb=ctx.img_rgb, right_to_left=resolve_rtl(config.render.rtl, config.translator.target_lang))
             cv2.imwrite(self._result_path('bboxes.png'), bboxes)
 
         # Apply pre-dictionary after textline merge
@@ -914,7 +914,7 @@ class MangaTranslator:
 
         text_regions = sort_regions(
             text_regions,
-            right_to_left=config.render.rtl,
+            right_to_left=resolve_rtl(config.render.rtl, config.translator.target_lang),
             img=ctx.img_rgb,
             force_simple_sort=config.force_simple_sort
         )   
@@ -1381,6 +1381,11 @@ class MangaTranslator:
                 output = await dispatch_eng_render_pillow(ctx.img_inpainted, ctx.img_rgb, ctx.text_regions, self.font_path, config.render.line_spacing)
             else:
                 output = await dispatch_eng_render(ctx.img_inpainted, ctx.img_rgb, ctx.text_regions, self.font_path, config.render.line_spacing)
+        # Use balloon-aware pillow renderer for Thai with default renderer to prevent text clipping
+        elif config.render.renderer == Renderer.default and ctx.text_regions and ctx.text_regions[0].target_lang == 'THA':
+            from .rendering.text_render import LANGUAGE_FONTS
+            thai_font = self.font_path or LANGUAGE_FONTS.get('THA', '')
+            output = await dispatch_eng_render_pillow(ctx.img_inpainted, ctx.img_rgb, ctx.text_regions, thai_font, config.render.line_spacing)
         else:
             output = await dispatch_rendering(ctx.img_inpainted, ctx.text_regions, self.font_path, config.render.font_size,
                                               config.render.font_size_offset,
@@ -1785,7 +1790,7 @@ class MangaTranslator:
         if self.verbose and ctx.text_regions:
             show_panels = not config.force_simple_sort  # 当不使用简单排序时显示panel
             bboxes = visualize_textblocks(cv2.cvtColor(ctx.img_rgb, cv2.COLOR_BGR2RGB), ctx.text_regions, 
-                                        show_panels=show_panels, img_rgb=ctx.img_rgb, right_to_left=config.render.rtl)
+                                        show_panels=show_panels, img_rgb=ctx.img_rgb, right_to_left=resolve_rtl(config.render.rtl, config.translator.target_lang))
             cv2.imwrite(self._result_path('bboxes.png'), bboxes)
 
         # Apply pre-dictionary after textline merge
