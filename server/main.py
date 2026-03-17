@@ -49,13 +49,6 @@ app.add_middleware(
 
 TOKEN_COST_PER_IMAGE = int(os.getenv("TOKEN_COST_PER_IMAGE", "1"))
 
-def _get_inpaint_device():
-    import torch
-    if torch.backends.mps.is_available():
-        return 'mps'
-    if torch.cuda.is_available():
-        return 'cuda'
-    return 'cpu'
 
 # Static files for result directory
 if RESULT_ROOT.exists():
@@ -271,73 +264,36 @@ async def inpaint(
     inpainting_size: int = Form(2048),
     user: AuthUser = Depends(get_current_user),
 ) -> StreamingResponse:
-    """Run AI inpainting: remove masked regions and fill with background."""
-    import logging
-    import sentry_sdk
-    logger = logging.getLogger(__name__)
-
+    """Run AI inpainting: route to RunPod GPU worker."""
     if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="inpaint", channel="api"):
         raise HTTPException(status_code=402, detail="Insufficient tokens")
+
+    import base64
+    import logging
+    import sentry_sdk
+    from server.runpod_adapter import submit_inpaint_job, poll_job
+
+    logger = logging.getLogger(__name__)
 
     img_bytes = await image.read()
     mask_bytes = await mask.read()
 
-    if WORKER_MODE == "runpod":
-        # Route inpaint through RunPod GPU worker
-        from server.runpod_adapter import submit_inpaint_job, poll_job, image_bytes_to_b64
-        import base64 as b64mod
+    image_b64 = base64.b64encode(img_bytes).decode("utf-8")
+    mask_b64 = base64.b64encode(mask_bytes).decode("utf-8")
 
-        image_b64 = image_bytes_to_b64(img_bytes)
-        mask_b64 = image_bytes_to_b64(mask_bytes)
+    logger.info("Inpaint request: image=%d bytes, mask=%d bytes, size=%d — routing to RunPod",
+                len(img_bytes), len(mask_bytes), inpainting_size)
 
-        logger.info("Submitting inpaint job to RunPod (size=%d)", inpainting_size)
-        try:
-            job_id = await submit_inpaint_job(image_b64, mask_b64, inpainting_size)
-            result = await poll_job(job_id)
-        except Exception as e:
-            logger.error("RunPod inpaint failed: %s", e, exc_info=True)
-            sentry_sdk.capture_exception(e)
-            raise HTTPException(status_code=500, detail=f"Inpainting failed: {e}")
-
-        if "error" in result:
-            raise HTTPException(status_code=500, detail=f"Inpainting failed: {result['error']}")
-
-        result_bytes = b64mod.b64decode(result["image_b64"])
-        return StreamingResponse(io.BytesIO(result_bytes), media_type="image/png")
-
-    # Local / Redis mode — run inference directly
-    import cv2
-    import numpy as np
-    from manga_translator.inpainting import dispatch as dispatch_inpainting
-    from manga_translator.config import Inpainter, InpainterConfig
-
-    img_arr = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_COLOR)
-    if img_arr is None:
-        raise HTTPException(400, "Invalid image")
-    img_rgb = cv2.cvtColor(img_arr, cv2.COLOR_BGR2RGB)
-
-    mask_arr = cv2.imdecode(np.frombuffer(mask_bytes, np.uint8), cv2.IMREAD_GRAYSCALE)
-    if mask_arr is None:
-        raise HTTPException(400, "Invalid mask")
-
-    if mask_arr.shape[:2] != img_rgb.shape[:2]:
-        mask_arr = cv2.resize(mask_arr, (img_rgb.shape[1], img_rgb.shape[0]), interpolation=cv2.INTER_NEAREST)
-
-    device = _get_inpaint_device()
-    logger.info("Inpaint request: image=%s mask=%s size=%d device=%s",
-                img_rgb.shape, mask_arr.shape, inpainting_size, device)
     try:
-        result = await dispatch_inpainting(
-            Inpainter.lama_large, img_rgb, mask_arr, InpainterConfig(), inpainting_size, device
-        )
+        job_id = await submit_inpaint_job(image_b64, mask_b64, inpainting_size)
+        result = await poll_job(job_id)
     except Exception as e:
         logger.error("Inpaint failed: %s", e, exc_info=True)
         sentry_sdk.capture_exception(e)
         raise HTTPException(status_code=500, detail=f"Inpainting failed: {e}")
 
-    result_bgr = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
-    _, png_data = cv2.imencode(".png", result_bgr)
-    return StreamingResponse(io.BytesIO(png_data.tobytes()), media_type="image/png")
+    result_bytes = base64.b64decode(result["image_b64"])
+    return StreamingResponse(io.BytesIO(result_bytes), media_type="image/png")
 
 
 @app.post("/queue-size", response_model=int, tags=["api", "json"])
