@@ -196,18 +196,73 @@ _RATING_GUIDANCE_HENTAI = {
 }
 
 import base64
+from io import BytesIO
+
+from PIL import Image
 
 
-def _download_image_as_base64(client, storage_path: str) -> str:
-    """Download image from Supabase Storage and return as base64 data URI."""
+def _download_image_bytes(client, storage_path: str) -> bytes:
+    """Download image from Supabase Storage and return raw bytes."""
     storage = client.storage.from_(BUCKET)
-    img_bytes = storage.download(storage_path)
-    b64 = base64.b64encode(img_bytes).decode("utf-8")
-    # Guess content type from extension
-    ext = storage_path.rsplit(".", 1)[-1].lower()
-    ct = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
-          "webp": "image/webp", "gif": "image/gif"}.get(ext, "image/png")
-    return f"data:{ct};base64,{b64}"
+    return storage.download(storage_path)
+
+
+def _resize_for_context(img_bytes: bytes, max_dim: int = 512) -> Image.Image:
+    """Resize image so longest side <= max_dim, preserving aspect ratio."""
+    img = Image.open(BytesIO(img_bytes))
+    img.thumbnail((max_dim, max_dim), Image.LANCZOS)
+    return img.convert("RGB")
+
+
+def _combine_images(images: list[Image.Image]) -> str:
+    """Stitch 1-4 images into a single grid and return base64 data URI.
+
+    Layout:
+    - 1 image: as-is
+    - 2 images: side by side horizontally
+    - 3 images: top row 2, bottom row 1 centered
+    - 4 images: 2x2 grid
+    """
+    n = len(images)
+    if n == 0:
+        raise ValueError("No images to combine")
+
+    if n == 1:
+        composite = images[0]
+    elif n == 2:
+        w = images[0].width + images[1].width
+        h = max(images[0].height, images[1].height)
+        composite = Image.new("RGB", (w, h), (255, 255, 255))
+        composite.paste(images[0], (0, 0))
+        composite.paste(images[1], (images[0].width, 0))
+    elif n == 3:
+        # Top row: 2 images side by side
+        top_w = images[0].width + images[1].width
+        top_h = max(images[0].height, images[1].height)
+        # Bottom row: 1 image centered
+        bot_w = images[2].width
+        total_w = max(top_w, bot_w)
+        total_h = top_h + images[2].height
+        composite = Image.new("RGB", (total_w, total_h), (255, 255, 255))
+        composite.paste(images[0], (0, 0))
+        composite.paste(images[1], (images[0].width, 0))
+        composite.paste(images[2], ((total_w - bot_w) // 2, top_h))
+    else:  # 4
+        # 2x2 grid
+        col0_w = max(images[0].width, images[2].width)
+        col1_w = max(images[1].width, images[3].width)
+        row0_h = max(images[0].height, images[1].height)
+        row1_h = max(images[2].height, images[3].height)
+        composite = Image.new("RGB", (col0_w + col1_w, row0_h + row1_h), (255, 255, 255))
+        composite.paste(images[0], (0, 0))
+        composite.paste(images[1], (col0_w, 0))
+        composite.paste(images[2], (0, row0_h))
+        composite.paste(images[3], (col0_w, row0_h))
+
+    buf = BytesIO()
+    composite.save(buf, format="JPEG", quality=80)
+    b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    return f"data:image/jpeg;base64,{b64}"
 
 
 def _select_sample_images(client, project_id: str) -> list[dict]:
@@ -235,21 +290,21 @@ def extract_manga_context(project_id: str, user_id: str) -> Optional[dict]:
         logger.warning("No images found for project %s, skipping context extraction", project_id)
         return None
 
-    # Build vision messages with image URLs
-    image_content = []
+    # Download and resize sample images, then combine into a single composite
+    pil_images = []
     for sample in samples:
         try:
-            data_uri = _download_image_as_base64(client, sample["original_image_path"])
-            image_content.append({
-                "type": "image_url",
-                "image_url": {"url": data_uri, "detail": "low"},
-            })
+            img_bytes = _download_image_bytes(client, sample["original_image_path"])
+            pil_images.append(_resize_for_context(img_bytes))
         except Exception as e:
             logger.warning("Failed to download image %s: %s", sample["id"], e)
 
-    if not image_content:
+    if not pil_images:
         logger.warning("Could not download any images for project %s", project_id)
         return None
+
+    composite_uri = _combine_images(pil_images)
+    logger.info("Combined %d sample images into single composite for project %s", len(pil_images), project_id)
 
     messages = [
         {"role": "system", "content": "You are a manga analysis assistant."},
@@ -257,7 +312,7 @@ def extract_manga_context(project_id: str, user_id: str) -> Optional[dict]:
             "role": "user",
             "content": [
                 {"type": "text", "text": _EXTRACTION_PROMPT},
-                *image_content,
+                {"type": "image_url", "image_url": {"url": composite_uri, "detail": "low"}},
             ],
         },
     ]

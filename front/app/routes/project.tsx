@@ -343,7 +343,7 @@ function ProjectContent() {
     }
     // Set up file statuses for untranslated images
     const m = new Map<string, FileStatus>();
-    untranslatedImages.forEach((pi) => m.set(pi.id, { status: null, progress: null, queuePos: null, result: null, error: null }));
+    untranslatedImages.forEach((pi) => m.set(pi.id, { status: "pending", progress: null, queuePos: null, result: null, error: null }));
     setFileStatuses(m);
     setShouldTranslate(true);
   };
