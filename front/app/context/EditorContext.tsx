@@ -383,7 +383,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         rect.x,
         rect.y,
         idPrefix,
-      );
+      ).map(b => ({ ...b, background: "" }));
 
       // Composite inpainted crop back onto full image
       let newImageUrl = img.originalFile ? "" : (img.originalImageUrl || "");
