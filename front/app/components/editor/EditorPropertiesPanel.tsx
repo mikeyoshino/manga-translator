@@ -514,8 +514,76 @@ function MagicRemoverPanel() {
   );
 }
 
+function ManualTranslatePanel() {
+  const {
+    currentImage, manualTranslateRect, clearManualTranslateRect,
+    isManualTranslating, applyManualTranslate, manualTranslateError,
+  } = useEditor();
+  const locale = getEditorLocale();
+  const i = editorT[locale];
+
+  const rect = currentImage ? manualTranslateRect.get(currentImage.id) ?? null : null;
+
+  return (
+    <div className="w-64 bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
+      <h3 className="text-sm font-bold mb-3 text-teal-700">{i.manualTranslate}</h3>
+
+      {!rect ? (
+        <p className="text-xs text-slate-500">{i.manualTranslateHint}</p>
+      ) : (
+        <>
+          <label className="block text-xs font-semibold text-slate-500 mb-1">{i.regionInfo}</label>
+          <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2 mb-3">
+            <span>X: {Math.round(rect.x)}, Y: {Math.round(rect.y)}</span>
+            <br />
+            <span>W: {Math.round(rect.width)} × H: {Math.round(rect.height)}</span>
+          </div>
+
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={() => currentImage && clearManualTranslateRect(currentImage.id)}
+              disabled={isManualTranslating}
+              className="flex-1 py-1.5 text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40 rounded-lg transition-colors"
+            >
+              {i.clearRect}
+            </button>
+          </div>
+
+          <button
+            onClick={() => currentImage && applyManualTranslate(currentImage.id)}
+            disabled={isManualTranslating}
+            className="w-full py-2 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            {isManualTranslating ? (
+              <>
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                {i.translatingRegion}
+              </>
+            ) : (
+              i.applyTranslation
+            )}
+          </button>
+        </>
+      )}
+
+      {manualTranslateError && (
+        <p className="mt-2 text-xs text-red-600 font-medium">
+          {manualTranslateError === "noTextDetected" ? i.noTextDetected : manualTranslateError}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function EditorPropertiesPanel() {
   const { activeTool } = useEditor();
+
+  if (activeTool === "manualTranslate") {
+    return <ManualTranslatePanel />;
+  }
 
   if (activeTool === "magicRemover") {
     return <MagicRemoverPanel />;

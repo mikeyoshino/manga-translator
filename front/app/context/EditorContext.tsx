@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from "react";
-import type { EditorImage, EditableBlock, EditorAction, ImageHistory } from "@/types";
+import type { EditorImage, EditableBlock, EditorAction, ImageHistory, TranslationResponseJson } from "@/types";
 import { createEmptyHistory, pushToHistory } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import Sentry from "@/lib/sentry";
+import { initEditableBlocksWithOffset } from "@/utils/initEditableBlocks";
+import { loadSettings } from "@/utils/localStorage";
 
 export interface DrawingLine {
   points: number[];
@@ -11,7 +13,14 @@ export interface DrawingLine {
   tool: "pen" | "eraser";
 }
 
-export type ActiveTool = "select" | "pen" | "eraser" | "magicRemover";
+export interface ManualTranslateRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export type ActiveTool = "select" | "pen" | "eraser" | "magicRemover" | "manualTranslate";
 
 interface EditorContextValue {
   images: EditorImage[];
@@ -42,6 +51,13 @@ interface EditorContextValue {
   imageHistory: Map<string, string[]>;
   applyMagicRemover: (imageId: string) => Promise<void>;
   undoMagicRemover: (imageId: string) => void;
+  // Manual translate
+  manualTranslateRect: Map<string, ManualTranslateRect | null>;
+  setManualTranslateRect: (imageId: string, rect: ManualTranslateRect | null) => void;
+  clearManualTranslateRect: (imageId: string) => void;
+  isManualTranslating: boolean;
+  applyManualTranslate: (imageId: string) => Promise<void>;
+  manualTranslateError: string | null;
   // Unified undo/redo
   undo: () => void;
   redo: () => void;
@@ -64,6 +80,9 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   const [isInpainting, setIsInpainting] = useState(false);
   const [imageHistory, setImageHistory] = useState<Map<string, string[]>>(new Map());
   const [historyMap, setHistoryMap] = useState<Map<string, ImageHistory>>(new Map());
+  const [manualTranslateRect, setManualTranslateRectMap] = useState<Map<string, ManualTranslateRect | null>>(new Map());
+  const [isManualTranslating, setIsManualTranslating] = useState(false);
+  const [manualTranslateError, setManualTranslateError] = useState<string | null>(null);
   const { session } = useAuth();
   const saveTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const imagesRef = useRef<EditorImage[]>([]);
@@ -259,6 +278,173 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, [magicRemoverLines, pushAction]);
+
+  const setManualTranslateRect = useCallback((imageId: string, rect: ManualTranslateRect | null) => {
+    setManualTranslateRectMap((prev) => {
+      const next = new Map(prev);
+      next.set(imageId, rect);
+      return next;
+    });
+    setManualTranslateError(null);
+  }, []);
+
+  const clearManualTranslateRect = useCallback((imageId: string) => {
+    setManualTranslateRect(imageId, null);
+  }, [setManualTranslateRect]);
+
+  const applyManualTranslate = useCallback(async (imageId: string) => {
+    const rect = manualTranslateRect.get(imageId);
+    if (!rect) return;
+
+    const img = images.find((im) => im.id === imageId);
+    if (!img) return;
+
+    const bgSrc = img.originalFile
+      ? URL.createObjectURL(img.originalFile)
+      : img.originalImageUrl;
+    if (!bgSrc) return;
+
+    setIsManualTranslating(true);
+    setManualTranslateError(null);
+    try {
+      // Load the background image
+      const bgImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new window.Image();
+        el.crossOrigin = "anonymous";
+        el.onload = () => resolve(el);
+        el.onerror = reject;
+        el.src = bgSrc;
+      });
+
+      // Crop to rect using offscreen canvas
+      const cropCanvas = document.createElement("canvas");
+      cropCanvas.width = rect.width;
+      cropCanvas.height = rect.height;
+      const cropCtx = cropCanvas.getContext("2d")!;
+      cropCtx.drawImage(bgImg, rect.x, rect.y, rect.width, rect.height, 0, 0, rect.width, rect.height);
+
+      const cropBlob = await new Promise<Blob>((resolve, reject) => {
+        cropCanvas.toBlob((b) => (b ? resolve(b) : reject(new Error("crop toBlob failed"))), "image/png");
+      });
+
+      // Clean up object URL if we created one
+      if (img.originalFile) URL.revokeObjectURL(bgSrc);
+
+      // Build translation config from saved settings
+      const savedSettings = loadSettings();
+      const config = JSON.stringify({
+        detector: {
+          detector: savedSettings.textDetector || "default",
+          detection_size: savedSettings.detectionResolution || "1536",
+          box_threshold: savedSettings.customBoxThreshold ?? 0.7,
+          unclip_ratio: savedSettings.customUnclipRatio ?? 2.3,
+        },
+        render: { direction: savedSettings.renderTextDirection || "auto" },
+        translator: {
+          translator: savedSettings.translator || "openai",
+          target_lang: savedSettings.targetLanguage || "THA",
+        },
+        inpainter: {
+          inpainter: savedSettings.inpainter || "default",
+          inpainting_size: savedSettings.inpaintingSize || "2048",
+        },
+        mask_dilation_offset: savedSettings.maskDilationOffset ?? 30,
+      });
+
+      const fd = new FormData();
+      fd.append("image", cropBlob, "crop.png");
+      fd.append("config", config);
+
+      const resp = await fetch("/api/translate/with-form/json", {
+        method: "POST",
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+        body: fd,
+      });
+
+      if (!resp.ok) {
+        let detail = `${resp.status}`;
+        try { const j = await resp.json(); detail = j.detail || detail; } catch {}
+        throw new Error(`Translation failed: ${detail}`);
+      }
+
+      const result: TranslationResponseJson = await resp.json();
+
+      if (!result.translations || result.translations.length === 0) {
+        setManualTranslateError("noTextDetected");
+        return;
+      }
+
+      // Create new editable blocks with coordinate offset
+      const targetLang = savedSettings.targetLanguage || "THA";
+      const idPrefix = `manual-${Date.now()}`;
+      const newBlocks = initEditableBlocksWithOffset(
+        result.translations,
+        targetLang,
+        rect.x,
+        rect.y,
+        idPrefix,
+      );
+
+      // Composite inpainted crop back onto full image
+      let newImageUrl = img.originalFile ? "" : (img.originalImageUrl || "");
+      const previousImageUrl = newImageUrl;
+
+      if (result.inpainted_image) {
+        const fullCanvas = document.createElement("canvas");
+        fullCanvas.width = bgImg.naturalWidth;
+        fullCanvas.height = bgImg.naturalHeight;
+        const fullCtx = fullCanvas.getContext("2d")!;
+        fullCtx.drawImage(bgImg, 0, 0);
+
+        // Decode inpainted crop (base64)
+        const inpaintedImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const el = new window.Image();
+          el.onload = () => resolve(el);
+          el.onerror = reject;
+          el.src = `data:image/png;base64,${result.inpainted_image}`;
+        });
+        fullCtx.drawImage(inpaintedImg, rect.x, rect.y, rect.width, rect.height);
+
+        const compositeBlob = await new Promise<Blob>((resolve, reject) => {
+          fullCanvas.toBlob((b) => (b ? resolve(b) : reject(new Error("composite toBlob failed"))), "image/png");
+        });
+        newImageUrl = URL.createObjectURL(compositeBlob);
+      }
+
+      // Update image: append blocks and update image URL
+      setImages((prev) =>
+        prev.map((im) => {
+          if (im.id !== imageId) return im;
+          return {
+            ...im,
+            editableBlocks: [...im.editableBlocks, ...newBlocks],
+            originalImageUrl: newImageUrl || im.originalImageUrl,
+            originalFile: newImageUrl ? null : im.originalFile,
+            isDirty: true,
+          };
+        })
+      );
+
+      // Push undo action
+      pushAction({
+        type: "manual-translate-apply",
+        imageId,
+        addedBlocks: newBlocks,
+        previousImageUrl,
+        newImageUrl: newImageUrl || previousImageUrl,
+      });
+
+      // Clear rect and switch to select tool
+      clearManualTranslateRect(imageId);
+      setActiveToolRaw("select");
+    } catch (err) {
+      console.error("Manual translate failed:", err);
+      Sentry.captureException(err);
+      setManualTranslateError(err instanceof Error ? err.message : "Translation failed");
+    } finally {
+      setIsManualTranslating(false);
+    }
+  }, [manualTranslateRect, images, session?.access_token, pushAction, clearManualTranslateRect]);
 
   const applyMagicRemover = useCallback(async (imageId: string) => {
     const lines = magicRemoverLines.get(imageId);
@@ -458,6 +644,22 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
           return next;
         });
         break;
+      case "manual-translate-apply": {
+        const blockIds = new Set(action.addedBlocks.map((b) => b.id));
+        setImages((prev) =>
+          prev.map((im) =>
+            im.id === action.imageId
+              ? {
+                  ...im,
+                  editableBlocks: im.editableBlocks.filter((b) => !blockIds.has(b.id)),
+                  originalImageUrl: action.previousImageUrl,
+                  originalFile: null,
+                }
+              : im
+          )
+        );
+        break;
+      }
     }
   }, [updateBlockInternal]);
 
@@ -511,6 +713,20 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
           next.set(action.imageId, stack);
           return next;
         });
+        break;
+      case "manual-translate-apply":
+        setImages((prev) =>
+          prev.map((im) =>
+            im.id === action.imageId
+              ? {
+                  ...im,
+                  editableBlocks: [...im.editableBlocks, ...action.addedBlocks],
+                  originalImageUrl: action.newImageUrl,
+                  originalFile: null,
+                }
+              : im
+          )
+        );
         break;
     }
   }, [updateBlockInternal]);
@@ -595,6 +811,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         imageHistory,
         applyMagicRemover,
         undoMagicRemover,
+        manualTranslateRect,
+        setManualTranslateRect,
+        clearManualTranslateRect,
+        isManualTranslating,
+        applyManualTranslate,
+        manualTranslateError,
         undo,
         redo,
         canUndo,
