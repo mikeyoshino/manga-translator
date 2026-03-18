@@ -12,6 +12,7 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
         secure: false,
+        cookieDomainRewrite: "localhost",
         // Configure WebSocket proxy if needed
         ws: true,
       },

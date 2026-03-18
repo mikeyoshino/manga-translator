@@ -25,12 +25,13 @@ from server.myqueue import task_queue, WORKER_MODE
 from server.instance import worker_registry
 from server.request_extraction import get_ctx, while_streaming, TranslateRequest, BatchTranslateRequest, get_batch_ctx
 from server.to_json import to_translation, TranslationResponse
-from server.auth import AuthUser, get_current_user
+from server.auth import AuthUser, get_current_user, AuthCookieMiddleware, create_session, signout_session, get_me
 import server.supabase_client as sb
 import server.payment as payment_svc
 import server.projects as projects
 
 app = FastAPI()
+app.add_middleware(AuthCookieMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -108,6 +109,15 @@ async def health():
         result["active_workers"] = workers
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Auth cookie endpoints
+# ---------------------------------------------------------------------------
+
+app.post("/auth/session", tags=["auth"])(create_session)
+app.post("/auth/signout", tags=["auth"])(signout_session)
+app.get("/auth/me", tags=["auth"])(get_me)
 
 
 # ---------------------------------------------------------------------------
