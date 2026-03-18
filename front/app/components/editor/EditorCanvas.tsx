@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from "react";
-import { Stage, Layer, Image as KonvaImage, Line } from "react-konva";
+import { Stage, Layer, Image as KonvaImage, Line, Rect } from "react-konva";
 import { useEditor } from "@/context/EditorContext";
 import { BlockOverlay } from "./BlockOverlay";
 import type { DrawingLine } from "@/context/EditorContext";
@@ -32,6 +32,8 @@ export function EditorCanvas() {
     magicRemoverLines,
     addMagicRemoverLine,
     magicRemoverSize,
+    manualTranslateRect,
+    setManualTranslateRect,
   } = useEditor();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -46,7 +48,12 @@ export function EditorCanvas() {
   const isDrawingRef = useRef(false);
   const [currentLine, setCurrentLine] = useState<DrawingLine | null>(null);
 
+  // Rectangle drawing state (manual translate)
+  const [rectStart, setRectStart] = useState<{ x: number; y: number } | null>(null);
+  const [rectCurrent, setRectCurrent] = useState<{ x: number; y: number } | null>(null);
+
   const isDrawingTool = activeTool === "pen" || activeTool === "eraser" || activeTool === "magicRemover";
+  const isRectTool = activeTool === "manualTranslate";
 
   // Load original image as base
   useEffect(() => {
@@ -198,6 +205,57 @@ export function EditorCanvas() {
     setCurrentLine(null);
   }, [currentLine, currentImage, addDrawingLine, addMagicRemoverLine, activeTool]);
 
+  // Rectangle drawing handlers (manual translate)
+  const handleRectStart = useCallback(() => {
+    if (!isRectTool || !currentImage) return;
+    const coords = getImageCoords();
+    if (!coords) return;
+    setRectStart(coords);
+    setRectCurrent(coords);
+  }, [isRectTool, currentImage, getImageCoords]);
+
+  const handleRectMove = useCallback(() => {
+    if (!rectStart) return;
+    const coords = getImageCoords();
+    if (!coords) return;
+    setRectCurrent(coords);
+  }, [rectStart, getImageCoords]);
+
+  const handleRectEnd = useCallback(() => {
+    if (!rectStart || !rectCurrent || !currentImage) {
+      setRectStart(null);
+      setRectCurrent(null);
+      return;
+    }
+    const x = Math.min(rectStart.x, rectCurrent.x);
+    const y = Math.min(rectStart.y, rectCurrent.y);
+    const width = Math.abs(rectCurrent.x - rectStart.x);
+    const height = Math.abs(rectCurrent.y - rectStart.y);
+
+    // Minimum 10x10 to avoid accidental clicks
+    if (width >= 10 && height >= 10) {
+      setManualTranslateRect(currentImage.id, { x, y, width, height });
+    }
+    setRectStart(null);
+    setRectCurrent(null);
+  }, [rectStart, rectCurrent, currentImage, setManualTranslateRect]);
+
+  // Combined mouse handlers
+  const handleMouseDown = useCallback(() => {
+    if (isRectTool) handleRectStart();
+    else handleDrawStart();
+  }, [isRectTool, handleRectStart, handleDrawStart]);
+
+  const handleMouseMove = useCallback(() => {
+    if (isRectTool) handleRectMove();
+    else handleDrawMove();
+  }, [isRectTool, handleRectMove, handleDrawMove]);
+
+  const handleMouseUp = useCallback(() => {
+    if (isRectTool) handleRectEnd();
+    else handleDrawEnd();
+  }, [isRectTool, handleRectEnd, handleDrawEnd]);
+
   // Double-click a block to start inline editing
   const handleBlockDblClick = useCallback(
     (blockId: string) => {
@@ -236,7 +294,7 @@ export function EditorCanvas() {
     <div
       ref={containerRef}
       className="w-full h-full bg-gray-950 overflow-hidden konva-stage relative"
-      style={{ cursor: isDrawingTool ? "crosshair" : undefined }}
+      style={{ cursor: (isDrawingTool || isRectTool) ? "crosshair" : undefined }}
     >
       <Stage
         ref={stageRef}
@@ -246,7 +304,7 @@ export function EditorCanvas() {
         scaleY={scale}
         x={position.x}
         y={position.y}
-        draggable={!isDrawingTool}
+        draggable={!isDrawingTool && !isRectTool}
         onDragEnd={(e) => {
           if (e.target === e.target.getStage()) {
             setPosition({ x: e.target.x(), y: e.target.y() });
@@ -254,12 +312,12 @@ export function EditorCanvas() {
         }}
         onClick={handleStageClick}
         onTap={handleStageClick}
-        onMouseDown={handleDrawStart}
-        onMouseMove={handleDrawMove}
-        onMouseUp={handleDrawEnd}
-        onTouchStart={handleDrawStart}
-        onTouchMove={handleDrawMove}
-        onTouchEnd={handleDrawEnd}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onTouchStart={handleMouseDown}
+        onTouchMove={handleMouseMove}
+        onTouchEnd={handleMouseUp}
         className="konva-stage"
       >
         <Layer>
@@ -268,7 +326,7 @@ export function EditorCanvas() {
             <BlockOverlay
               key={block.id}
               block={block}
-              interactive={!isDrawingTool}
+              interactive={!isDrawingTool && !isRectTool}
               isSelected={block.id === selectedBlockId}
               isEditing={inlineEdit?.blockId === block.id}
               onSelect={() => {
@@ -349,6 +407,39 @@ export function EditorCanvas() {
               globalCompositeOperation="source-over"
             />
           )}
+        </Layer>
+
+        {/* Manual translate rectangle overlay */}
+        <Layer>
+          {/* In-progress rubber-band rect */}
+          {rectStart && rectCurrent && (
+            <Rect
+              x={Math.min(rectStart.x, rectCurrent.x)}
+              y={Math.min(rectStart.y, rectCurrent.y)}
+              width={Math.abs(rectCurrent.x - rectStart.x)}
+              height={Math.abs(rectCurrent.y - rectStart.y)}
+              stroke="#0d9488"
+              strokeWidth={2 / scale}
+              dash={[8 / scale, 4 / scale]}
+              fill="rgba(13, 148, 136, 0.1)"
+            />
+          )}
+          {/* Finalized rect from context */}
+          {currentImage && (() => {
+            const finalRect = manualTranslateRect.get(currentImage.id);
+            return finalRect ? (
+              <Rect
+                x={finalRect.x}
+                y={finalRect.y}
+                width={finalRect.width}
+                height={finalRect.height}
+                stroke="#0d9488"
+                strokeWidth={2 / scale}
+                dash={[8 / scale, 4 / scale]}
+                fill="rgba(13, 148, 136, 0.15)"
+              />
+            ) : null;
+          })()}
         </Layer>
       </Stage>
 

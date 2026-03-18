@@ -104,6 +104,26 @@ function autoFitFontSize(
   return Math.max(fontSize, minSize);
 }
 
+export function initEditableBlocksWithOffset(
+  blocks: TranslationBlock[],
+  targetLang: string,
+  offsetX: number,
+  offsetY: number,
+  idPrefix: string
+): EditableBlock[] {
+  const base = initEditableBlocks(blocks, targetLang);
+  return base.map((block, index) => ({
+    ...block,
+    id: `${idPrefix}-${index}`,
+    minX: block.minX + offsetX,
+    minY: block.minY + offsetY,
+    maxX: block.maxX + offsetX,
+    maxY: block.maxY + offsetY,
+    editedX: block.editedX + offsetX,
+    editedY: block.editedY + offsetY,
+  }));
+}
+
 export function initEditableBlocks(
   blocks: TranslationBlock[],
   targetLang: string
