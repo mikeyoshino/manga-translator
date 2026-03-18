@@ -2,7 +2,7 @@ import { useEditor } from "@/context/EditorContext";
 import { useNavigate } from "react-router";
 import { exportSingleImage, exportAllAsZip } from "@/utils/exportZip";
 import { useCallback } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, FolderArchive, Pencil, Eraser, Undo2, Redo2, Sparkles, ScanSearch } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, FolderArchive, Pencil, Eraser, Undo2, Redo2, Sparkles, ScanSearch, Stamp } from "lucide-react";
 import { getEditorLocale, editorT } from "@/utils/editorI18n";
 
 export function EditorToolbar() {
@@ -11,6 +11,7 @@ export function EditorToolbar() {
     setSelectedBlockId, activeTool, setActiveTool,
     drawingLines, undoDrawingLine,
     magicRemoverLines, undoMagicRemoverLine,
+    cloneStampStrokes, undoCloneStampStroke,
     undo, redo, canUndo, canRedo,
   } = useEditor();
   const navigate = useNavigate();
@@ -42,13 +43,14 @@ export function EditorToolbar() {
     exportAllAsZip(getter, images);
   }, [images]);
 
-  const handleToolClick = (tool: "pen" | "eraser" | "magicRemover" | "manualTranslate") => {
+  const handleToolClick = (tool: "pen" | "eraser" | "magicRemover" | "manualTranslate" | "cloneStamp") => {
     setActiveTool(activeTool === tool ? "select" : tool);
   };
 
   const currentLines = currentImage ? (drawingLines.get(currentImage.id) || []) : [];
   const currentMagicLines = currentImage ? (magicRemoverLines.get(currentImage.id) || []) : [];
-  const isDrawing = activeTool === "pen" || activeTool === "eraser" || activeTool === "magicRemover" || activeTool === "manualTranslate";
+  const currentCloneStrokes = currentImage ? (cloneStampStrokes.get(currentImage.id) || []) : [];
+  const isDrawing = activeTool === "pen" || activeTool === "eraser" || activeTool === "magicRemover" || activeTool === "manualTranslate" || activeTool === "cloneStamp";
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 bg-white border-b border-slate-200 shrink-0">
@@ -131,11 +133,23 @@ export function EditorToolbar() {
         >
           <ScanSearch className="w-4 h-4" />
         </button>
-        {isDrawing && (activeTool === "magicRemover" ? currentMagicLines.length > 0 : currentLines.length > 0) && (
+        <button
+          onClick={() => handleToolClick("cloneStamp")}
+          title={i.cloneStamp}
+          className={`p-1.5 rounded-lg transition-colors ${
+            activeTool === "cloneStamp"
+              ? "bg-amber-600 text-white"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <Stamp className="w-4 h-4" />
+        </button>
+        {isDrawing && (activeTool === "magicRemover" ? currentMagicLines.length > 0 : activeTool === "cloneStamp" ? currentCloneStrokes.length > 0 : currentLines.length > 0) && (
           <button
             onClick={() => {
               if (!currentImage) return;
               if (activeTool === "magicRemover") undoMagicRemoverLine(currentImage.id);
+              else if (activeTool === "cloneStamp") undoCloneStampStroke(currentImage.id);
               else undoDrawingLine(currentImage.id);
             }}
             title={i.undo}
