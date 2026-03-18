@@ -1,8 +1,8 @@
 import { useRef, useEffect, useState, useCallback } from "react";
-import { Stage, Layer, Image as KonvaImage, Line, Rect } from "react-konva";
+import { Stage, Layer, Image as KonvaImage, Line, Rect, Circle } from "react-konva";
 import { useEditor } from "@/context/EditorContext";
 import { BlockOverlay } from "./BlockOverlay";
-import type { DrawingLine } from "@/context/EditorContext";
+import type { DrawingLine, CloneStampStroke } from "@/context/EditorContext";
 
 interface InlineEdit {
   blockId: string;
@@ -34,6 +34,12 @@ export function EditorCanvas() {
     magicRemoverSize,
     manualTranslateRect,
     setManualTranslateRect,
+    cloneStampSource,
+    setCloneStampSource,
+    cloneStampStrokes,
+    addCloneStampStroke,
+    cloneStampSize,
+    cloneStampOpacity,
   } = useEditor();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -52,8 +58,15 @@ export function EditorCanvas() {
   const [rectStart, setRectStart] = useState<{ x: number; y: number } | null>(null);
   const [rectCurrent, setRectCurrent] = useState<{ x: number; y: number } | null>(null);
 
+  // Clone stamp state
+  const [currentCloneStroke, setCurrentCloneStroke] = useState<CloneStampStroke | null>(null);
+  const [cloneStampPreview, setCloneStampPreview] = useState<HTMLImageElement | null>(null);
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
   const isDrawingTool = activeTool === "pen" || activeTool === "eraser" || activeTool === "magicRemover";
   const isRectTool = activeTool === "manualTranslate";
+  const isCloneStampTool = activeTool === "cloneStamp";
 
   // Load original image as base
   useEffect(() => {
@@ -139,13 +152,13 @@ export function EditorCanvas() {
 
   const handleStageClick = useCallback(
     (e: any) => {
-      if (isDrawingTool) return;
+      if (isDrawingTool || isCloneStampTool) return;
       if (e.target === e.target.getStage() || e.target.getClassName() === "Image") {
         setSelectedBlockId(null);
         if (inlineEdit) commitInlineEdit();
       }
     },
-    [setSelectedBlockId, inlineEdit, commitInlineEdit, isDrawingTool]
+    [setSelectedBlockId, inlineEdit, commitInlineEdit, isDrawingTool, isCloneStampTool]
   );
 
   // Convert screen coords to image coords
@@ -240,21 +253,135 @@ export function EditorCanvas() {
     setRectCurrent(null);
   }, [rectStart, rectCurrent, currentImage, setManualTranslateRect]);
 
+  // Clone stamp handlers
+  const renderCloneStampPreview = useCallback((strokes: CloneStampStroke[], currentStroke: CloneStampStroke | null) => {
+    if (!bgImage) return;
+    if (!previewCanvasRef.current) {
+      previewCanvasRef.current = document.createElement("canvas");
+    }
+    const canvas = previewCanvasRef.current;
+    canvas.width = bgImage.naturalWidth;
+    canvas.height = bgImage.naturalHeight;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const allStrokes = currentStroke ? [...strokes, currentStroke] : strokes;
+    for (const stroke of allStrokes) {
+      if (stroke.points.length < 2) continue;
+      const offsetX = stroke.sourceX - stroke.points[0];
+      const offsetY = stroke.sourceY - stroke.points[1];
+      const r = stroke.size / 2;
+
+      for (let j = 0; j < stroke.points.length; j += 2) {
+        const destX = stroke.points[j];
+        const destY = stroke.points[j + 1];
+        const srcX = destX + offsetX;
+        const srcY = destY + offsetY;
+
+        const sx = Math.max(0, Math.min(bgImage.naturalWidth, srcX - r));
+        const sy = Math.max(0, Math.min(bgImage.naturalHeight, srcY - r));
+        const sw = Math.min(bgImage.naturalWidth - sx, r * 2);
+        const sh = Math.min(bgImage.naturalHeight - sy, r * 2);
+        if (sw <= 0 || sh <= 0) continue;
+
+        ctx.save();
+        ctx.globalAlpha = stroke.opacity;
+        ctx.beginPath();
+        ctx.arc(destX, destY, r, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(bgImage, sx, sy, sw, sh, sx - offsetX, sy - offsetY, sw, sh);
+        ctx.restore();
+      }
+    }
+
+    const previewImg = new window.Image();
+    previewImg.onload = () => setCloneStampPreview(previewImg);
+    previewImg.src = canvas.toDataURL();
+  }, [bgImage]);
+
+  const handleCloneStampDown = useCallback((e: any) => {
+    if (!isCloneStampTool || !currentImage) return;
+    const coords = getImageCoords();
+    if (!coords) return;
+
+    if (e.evt?.altKey) {
+      setCloneStampSource(currentImage.id, { x: coords.x, y: coords.y });
+      return;
+    }
+
+    const source = cloneStampSource.get(currentImage.id);
+    if (!source) return;
+
+    const stroke: CloneStampStroke = {
+      sourceX: source.x,
+      sourceY: source.y,
+      points: [coords.x, coords.y],
+      size: cloneStampSize,
+      opacity: cloneStampOpacity,
+    };
+    setCurrentCloneStroke(stroke);
+    isDrawingRef.current = true;
+  }, [isCloneStampTool, currentImage, getImageCoords, cloneStampSource, setCloneStampSource, cloneStampSize, cloneStampOpacity]);
+
+  const handleCloneStampMove = useCallback(() => {
+    const coords = getImageCoords();
+    if (coords) setCursorPos(coords);
+
+    if (!isDrawingRef.current || !currentCloneStroke) return;
+    if (!coords) return;
+
+    setCurrentCloneStroke((prev) => {
+      if (!prev) return null;
+      const updated = { ...prev, points: [...prev.points, coords.x, coords.y] };
+      // Throttled preview update
+      if (currentImage) {
+        const strokes = cloneStampStrokes.get(currentImage.id) || [];
+        requestAnimationFrame(() => renderCloneStampPreview(strokes, updated));
+      }
+      return updated;
+    });
+  }, [getImageCoords, currentCloneStroke, currentImage, cloneStampStrokes, renderCloneStampPreview]);
+
+  const handleCloneStampEnd = useCallback(() => {
+    if (!isDrawingRef.current || !currentCloneStroke || !currentImage) return;
+    isDrawingRef.current = false;
+    if (currentCloneStroke.points.length >= 2) {
+      addCloneStampStroke(currentImage.id, currentCloneStroke);
+      const strokes = [...(cloneStampStrokes.get(currentImage.id) || []), currentCloneStroke];
+      renderCloneStampPreview(strokes, null);
+    }
+    setCurrentCloneStroke(null);
+  }, [currentCloneStroke, currentImage, addCloneStampStroke, cloneStampStrokes, renderCloneStampPreview]);
+
+  // Clear preview when strokes are cleared
+  useEffect(() => {
+    if (!currentImage) return;
+    const strokes = cloneStampStrokes.get(currentImage.id) || [];
+    if (strokes.length === 0 && !currentCloneStroke) {
+      setCloneStampPreview(null);
+    } else {
+      renderCloneStampPreview(strokes, currentCloneStroke);
+    }
+  }, [currentImage?.id, cloneStampStrokes, currentCloneStroke, renderCloneStampPreview]);
+
   // Combined mouse handlers
-  const handleMouseDown = useCallback(() => {
-    if (isRectTool) handleRectStart();
+  const handleMouseDown = useCallback((e: any) => {
+    if (isCloneStampTool) handleCloneStampDown(e);
+    else if (isRectTool) handleRectStart();
     else handleDrawStart();
-  }, [isRectTool, handleRectStart, handleDrawStart]);
+  }, [isCloneStampTool, isRectTool, handleCloneStampDown, handleRectStart, handleDrawStart]);
 
   const handleMouseMove = useCallback(() => {
-    if (isRectTool) handleRectMove();
+    if (isCloneStampTool) handleCloneStampMove();
+    else if (isRectTool) handleRectMove();
     else handleDrawMove();
-  }, [isRectTool, handleRectMove, handleDrawMove]);
+  }, [isCloneStampTool, isRectTool, handleCloneStampMove, handleRectMove, handleDrawMove]);
 
   const handleMouseUp = useCallback(() => {
-    if (isRectTool) handleRectEnd();
+    if (isCloneStampTool) handleCloneStampEnd();
+    else if (isRectTool) handleRectEnd();
     else handleDrawEnd();
-  }, [isRectTool, handleRectEnd, handleDrawEnd]);
+  }, [isCloneStampTool, isRectTool, handleCloneStampEnd, handleRectEnd, handleDrawEnd]);
 
   // Double-click a block to start inline editing
   const handleBlockDblClick = useCallback(
@@ -294,7 +421,7 @@ export function EditorCanvas() {
     <div
       ref={containerRef}
       className="w-full h-full bg-gray-950 overflow-hidden konva-stage relative"
-      style={{ cursor: (isDrawingTool || isRectTool) ? "crosshair" : undefined }}
+      style={{ cursor: (isDrawingTool || isRectTool || isCloneStampTool) ? "crosshair" : undefined }}
     >
       <Stage
         ref={stageRef}
@@ -304,7 +431,7 @@ export function EditorCanvas() {
         scaleY={scale}
         x={position.x}
         y={position.y}
-        draggable={!isDrawingTool && !isRectTool}
+        draggable={!isDrawingTool && !isRectTool && !isCloneStampTool}
         onDragEnd={(e) => {
           if (e.target === e.target.getStage()) {
             setPosition({ x: e.target.x(), y: e.target.y() });
@@ -312,10 +439,10 @@ export function EditorCanvas() {
         }}
         onClick={handleStageClick}
         onTap={handleStageClick}
-        onMouseDown={handleMouseDown}
+        onMouseDown={(e) => handleMouseDown(e)}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onTouchStart={handleMouseDown}
+        onTouchStart={(e) => handleMouseDown(e)}
         onTouchMove={handleMouseMove}
         onTouchEnd={handleMouseUp}
         className="konva-stage"
@@ -326,7 +453,7 @@ export function EditorCanvas() {
             <BlockOverlay
               key={block.id}
               block={block}
-              interactive={!isDrawingTool && !isRectTool}
+              interactive={!isDrawingTool && !isRectTool && !isCloneStampTool}
               isSelected={block.id === selectedBlockId}
               isEditing={inlineEdit?.blockId === block.id}
               onSelect={() => {
@@ -407,6 +534,61 @@ export function EditorCanvas() {
               globalCompositeOperation="source-over"
             />
           )}
+        </Layer>
+
+        {/* Clone stamp preview + visual feedback layer */}
+        <Layer>
+          {isCloneStampTool && cloneStampPreview && (
+            <KonvaImage image={cloneStampPreview} />
+          )}
+          {/* Source crosshair */}
+          {isCloneStampTool && currentImage && (() => {
+            const source = cloneStampSource.get(currentImage.id);
+            if (!source) return null;
+            const crossSize = 12 / scale;
+            return (
+              <>
+                <Line
+                  points={[source.x - crossSize, source.y, source.x + crossSize, source.y]}
+                  stroke="#22c55e"
+                  strokeWidth={2 / scale}
+                />
+                <Line
+                  points={[source.x, source.y - crossSize, source.x, source.y + crossSize]}
+                  stroke="#22c55e"
+                  strokeWidth={2 / scale}
+                />
+              </>
+            );
+          })()}
+          {/* Brush cursor */}
+          {isCloneStampTool && cursorPos && (
+            <Circle
+              x={cursorPos.x}
+              y={cursorPos.y}
+              radius={cloneStampSize / 2}
+              stroke="#d97706"
+              strokeWidth={1 / scale}
+              dash={[4 / scale, 3 / scale]}
+              listening={false}
+            />
+          )}
+          {/* Source tracking circle while painting */}
+          {isCloneStampTool && currentCloneStroke && cursorPos && (() => {
+            const offsetX = currentCloneStroke.sourceX - currentCloneStroke.points[0];
+            const offsetY = currentCloneStroke.sourceY - currentCloneStroke.points[1];
+            return (
+              <Circle
+                x={cursorPos.x + offsetX}
+                y={cursorPos.y + offsetY}
+                radius={cloneStampSize / 2}
+                stroke="#22c55e"
+                strokeWidth={1 / scale}
+                dash={[4 / scale, 3 / scale]}
+                listening={false}
+              />
+            );
+          })()}
         </Layer>
 
         {/* Manual translate rectangle overlay */}

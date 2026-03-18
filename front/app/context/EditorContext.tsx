@@ -13,6 +13,14 @@ export interface DrawingLine {
   tool: "pen" | "eraser";
 }
 
+export interface CloneStampStroke {
+  sourceX: number;
+  sourceY: number;
+  points: number[];
+  size: number;
+  opacity: number;
+}
+
 export interface ManualTranslateRect {
   x: number;
   y: number;
@@ -20,7 +28,7 @@ export interface ManualTranslateRect {
   height: number;
 }
 
-export type ActiveTool = "select" | "pen" | "eraser" | "magicRemover" | "manualTranslate";
+export type ActiveTool = "select" | "pen" | "eraser" | "magicRemover" | "manualTranslate" | "cloneStamp";
 
 interface EditorContextValue {
   images: EditorImage[];
@@ -58,6 +66,20 @@ interface EditorContextValue {
   isManualTranslating: boolean;
   applyManualTranslate: (imageId: string) => Promise<void>;
   manualTranslateError: string | null;
+  // Clone stamp
+  cloneStampSize: number;
+  setCloneStampSize: React.Dispatch<React.SetStateAction<number>>;
+  cloneStampOpacity: number;
+  setCloneStampOpacity: React.Dispatch<React.SetStateAction<number>>;
+  cloneStampSource: Map<string, { x: number; y: number } | null>;
+  setCloneStampSource: (imageId: string, point: { x: number; y: number } | null) => void;
+  clearCloneStampSource: (imageId: string) => void;
+  cloneStampStrokes: Map<string, CloneStampStroke[]>;
+  addCloneStampStroke: (imageId: string, stroke: CloneStampStroke) => void;
+  undoCloneStampStroke: (imageId: string) => void;
+  clearCloneStampStrokes: (imageId: string) => void;
+  isCloneStamping: boolean;
+  applyCloneStamp: (imageId: string) => Promise<void>;
   // Unified undo/redo
   undo: () => void;
   redo: () => void;
@@ -83,6 +105,11 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   const [manualTranslateRect, setManualTranslateRectMap] = useState<Map<string, ManualTranslateRect | null>>(new Map());
   const [isManualTranslating, setIsManualTranslating] = useState(false);
   const [manualTranslateError, setManualTranslateError] = useState<string | null>(null);
+  const [cloneStampSize, setCloneStampSize] = useState(20);
+  const [cloneStampOpacity, setCloneStampOpacity] = useState(1.0);
+  const [cloneStampSourceMap, setCloneStampSourceMap] = useState<Map<string, { x: number; y: number } | null>>(new Map());
+  const [cloneStampStrokes, setCloneStampStrokes] = useState<Map<string, CloneStampStroke[]>>(new Map());
+  const [isCloneStamping, setIsCloneStamping] = useState(false);
   const { session } = useAuth();
   const saveTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const imagesRef = useRef<EditorImage[]>([]);
@@ -291,6 +318,141 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   const clearManualTranslateRect = useCallback((imageId: string) => {
     setManualTranslateRect(imageId, null);
   }, [setManualTranslateRect]);
+
+  const setCloneStampSource = useCallback((imageId: string, point: { x: number; y: number } | null) => {
+    setCloneStampSourceMap((prev) => {
+      const next = new Map(prev);
+      next.set(imageId, point);
+      return next;
+    });
+  }, []);
+
+  const clearCloneStampSource = useCallback((imageId: string) => {
+    setCloneStampSource(imageId, null);
+  }, [setCloneStampSource]);
+
+  const addCloneStampStroke = useCallback((imageId: string, stroke: CloneStampStroke) => {
+    setCloneStampStrokes((prev) => {
+      const next = new Map(prev);
+      next.set(imageId, [...(next.get(imageId) || []), stroke]);
+      return next;
+    });
+  }, []);
+
+  const undoCloneStampStroke = useCallback((imageId: string) => {
+    setCloneStampStrokes((prev) => {
+      const strokes = prev.get(imageId);
+      if (!strokes || strokes.length === 0) return prev;
+      const next = new Map(prev);
+      next.set(imageId, strokes.slice(0, -1));
+      return next;
+    });
+  }, []);
+
+  const clearCloneStampStrokes = useCallback((imageId: string) => {
+    setCloneStampStrokes((prev) => {
+      const next = new Map(prev);
+      next.set(imageId, []);
+      return next;
+    });
+  }, []);
+
+  const applyCloneStamp = useCallback(async (imageId: string) => {
+    const strokes = cloneStampStrokes.get(imageId);
+    if (!strokes || strokes.length === 0) return;
+
+    const img = images.find((im) => im.id === imageId);
+    if (!img) return;
+
+    const bgSrc = img.originalFile
+      ? URL.createObjectURL(img.originalFile)
+      : img.originalImageUrl;
+    if (!bgSrc) return;
+
+    setIsCloneStamping(true);
+    try {
+      const bgImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new window.Image();
+        el.crossOrigin = "anonymous";
+        el.onload = () => resolve(el);
+        el.onerror = reject;
+        el.src = bgSrc;
+      });
+
+      const offscreen = document.createElement("canvas");
+      offscreen.width = bgImg.naturalWidth;
+      offscreen.height = bgImg.naturalHeight;
+      const ctx = offscreen.getContext("2d")!;
+      ctx.drawImage(bgImg, 0, 0);
+
+      // For each stroke, copy pixels from source region of the original image
+      for (const stroke of strokes) {
+        if (stroke.points.length < 2) continue;
+        const offsetX = stroke.sourceX - stroke.points[0];
+        const offsetY = stroke.sourceY - stroke.points[1];
+        const r = stroke.size / 2;
+
+        for (let j = 0; j < stroke.points.length; j += 2) {
+          const destX = stroke.points[j];
+          const destY = stroke.points[j + 1];
+          const srcX = destX + offsetX;
+          const srcY = destY + offsetY;
+
+          // Clamp source region to image bounds
+          const sx = Math.max(0, Math.min(bgImg.naturalWidth, srcX - r));
+          const sy = Math.max(0, Math.min(bgImg.naturalHeight, srcY - r));
+          const sw = Math.min(bgImg.naturalWidth - sx, r * 2);
+          const sh = Math.min(bgImg.naturalHeight - sy, r * 2);
+          if (sw <= 0 || sh <= 0) continue;
+
+          ctx.save();
+          ctx.globalAlpha = stroke.opacity;
+          ctx.beginPath();
+          ctx.arc(destX, destY, r, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(bgImg, sx, sy, sw, sh, sx - offsetX, sy - offsetY, sw, sh);
+          ctx.restore();
+        }
+      }
+
+      if (img.originalFile) URL.revokeObjectURL(bgSrc);
+
+      const resultBlob = await new Promise<Blob>((resolve, reject) => {
+        offscreen.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png");
+      });
+      const resultUrl = URL.createObjectURL(resultBlob);
+
+      const previousImageUrl = img.originalFile ? "" : (img.originalImageUrl || "");
+
+      pushAction({
+        type: "clone-stamp-apply",
+        imageId,
+        previousImageUrl,
+        newImageUrl: resultUrl,
+      });
+
+      setImages((prev) =>
+        prev.map((im) =>
+          im.id === imageId
+            ? { ...im, originalImageUrl: resultUrl, originalFile: null }
+            : im
+        )
+      );
+
+      // Clear strokes after apply
+      setCloneStampStrokes((prev) => {
+        const next = new Map(prev);
+        next.set(imageId, []);
+        return next;
+      });
+    } catch (err) {
+      console.error("Clone stamp apply failed:", err);
+      Sentry.captureException(err);
+      alert(err instanceof Error ? err.message : "Clone stamp failed");
+    } finally {
+      setIsCloneStamping(false);
+    }
+  }, [cloneStampStrokes, images, pushAction]);
 
   const applyManualTranslate = useCallback(async (imageId: string) => {
     const rect = manualTranslateRect.get(imageId);
@@ -663,6 +825,15 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         );
         break;
       }
+      case "clone-stamp-apply":
+        setImages((prev) =>
+          prev.map((im) =>
+            im.id === action.imageId
+              ? { ...im, originalImageUrl: action.previousImageUrl, originalFile: null }
+              : im
+          )
+        );
+        break;
     }
   }, [updateBlockInternal]);
 
@@ -727,6 +898,15 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
                   originalImageUrl: action.newImageUrl,
                   originalFile: null,
                 }
+              : im
+          )
+        );
+        break;
+      case "clone-stamp-apply":
+        setImages((prev) =>
+          prev.map((im) =>
+            im.id === action.imageId
+              ? { ...im, originalImageUrl: action.newImageUrl, originalFile: null }
               : im
           )
         );
@@ -820,6 +1000,19 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         isManualTranslating,
         applyManualTranslate,
         manualTranslateError,
+        cloneStampSize,
+        setCloneStampSize,
+        cloneStampOpacity,
+        setCloneStampOpacity,
+        cloneStampSource: cloneStampSourceMap,
+        setCloneStampSource,
+        clearCloneStampSource,
+        cloneStampStrokes,
+        addCloneStampStroke,
+        undoCloneStampStroke,
+        clearCloneStampStrokes,
+        isCloneStamping,
+        applyCloneStamp,
         undo,
         redo,
         canUndo,

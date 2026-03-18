@@ -202,7 +202,8 @@ export type EditorAction =
   | { type: "magic-line-add"; imageId: string; line: DrawingLine }
   | { type: "magic-clear"; imageId: string; lines: DrawingLine[] }
   | { type: "magic-remover-apply"; imageId: string; previousImageUrl: string; newImageUrl: string }
-  | { type: "manual-translate-apply"; imageId: string; addedBlocks: EditableBlock[]; previousImageUrl: string; newImageUrl: string };
+  | { type: "manual-translate-apply"; imageId: string; addedBlocks: EditableBlock[]; previousImageUrl: string; newImageUrl: string }
+  | { type: "clone-stamp-apply"; imageId: string; previousImageUrl: string; newImageUrl: string };
 
 export interface DrawingLine {
   points: number[];

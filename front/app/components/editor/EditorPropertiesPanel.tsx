@@ -578,8 +578,142 @@ function ManualTranslatePanel() {
   );
 }
 
+function CloneStampPanel() {
+  const {
+    currentImage, cloneStampSource, cloneStampSize, setCloneStampSize,
+    cloneStampOpacity, setCloneStampOpacity,
+    clearCloneStampSource, cloneStampStrokes,
+    undoCloneStampStroke, clearCloneStampStrokes,
+    isCloneStamping, applyCloneStamp,
+  } = useEditor();
+  const locale = getEditorLocale();
+  const i = editorT[locale];
+
+  const source = currentImage ? (cloneStampSource.get(currentImage.id) ?? null) : null;
+  const strokes = currentImage ? (cloneStampStrokes.get(currentImage.id) || []) : [];
+
+  return (
+    <div className="w-64 bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
+      <h3 className="text-sm font-bold mb-3 text-amber-700">{i.cloneStamp}</h3>
+
+      {/* Source point */}
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.sourcePoint}</label>
+      <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2 mb-3">
+        {source
+          ? `X: ${Math.round(source.x)}, Y: ${Math.round(source.y)}`
+          : (locale === "th" ? "ยังไม่ได้ตั้ง" : "Not set")}
+      </div>
+
+      {/* Brush size */}
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.brushSize}</label>
+      <div className="flex items-center gap-2 mb-3">
+        <input
+          type="range"
+          min={5}
+          max={100}
+          value={cloneStampSize}
+          onChange={(e) => setCloneStampSize(Number(e.target.value))}
+          className="flex-1"
+        />
+        <span className="text-xs text-slate-600 w-8 text-right">{cloneStampSize}px</span>
+      </div>
+
+      {/* Opacity */}
+      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.opacity}</label>
+      <div className="flex items-center gap-2 mb-3">
+        <input
+          type="range"
+          min={10}
+          max={100}
+          value={Math.round(cloneStampOpacity * 100)}
+          onChange={(e) => setCloneStampOpacity(Number(e.target.value) / 100)}
+          className="flex-1"
+        />
+        <span className="text-xs text-slate-600 w-8 text-right">{Math.round(cloneStampOpacity * 100)}%</span>
+      </div>
+
+      {/* Clear source / Clear strokes */}
+      <div className="flex gap-2 mb-3">
+        <button
+          onClick={() => currentImage && clearCloneStampSource(currentImage.id)}
+          disabled={!source}
+          className="flex-1 py-1.5 text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40 rounded-lg transition-colors"
+        >
+          {i.clearSource}
+        </button>
+        <button
+          onClick={() => currentImage && clearCloneStampStrokes(currentImage.id)}
+          disabled={strokes.length === 0}
+          className="flex-1 py-1.5 text-xs font-semibold bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 disabled:opacity-40 rounded-lg transition-colors"
+        >
+          {i.clearStrokes}
+        </button>
+      </div>
+
+      {/* Undo stroke */}
+      <button
+        onClick={() => currentImage && undoCloneStampStroke(currentImage.id)}
+        disabled={strokes.length === 0}
+        className="w-full mb-2 py-1.5 text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40 rounded-lg transition-colors"
+      >
+        {i.undo}
+      </button>
+
+      {/* Apply button */}
+      <button
+        onClick={() => currentImage && applyCloneStamp(currentImage.id)}
+        disabled={isCloneStamping || strokes.length === 0}
+        className="w-full py-2 text-sm font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-2"
+      >
+        {isCloneStamping ? (
+          <>
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            ...
+          </>
+        ) : (
+          i.applyCloneStamp
+        )}
+      </button>
+
+      {/* Bilingual guide */}
+      <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
+        <p className="text-xs font-bold text-amber-800 mb-2">{i.guideTitle}</p>
+        <ol className="space-y-2 text-xs">
+          <li>
+            <span className="text-slate-700">1. {i.guideStep1_th}</span>
+            <br />
+            <span className="text-slate-400">&nbsp;&nbsp;&nbsp;{i.guideStep1_en}</span>
+          </li>
+          <li>
+            <span className="text-slate-700">2. {i.guideStep2_th}</span>
+            <br />
+            <span className="text-slate-400">&nbsp;&nbsp;&nbsp;{i.guideStep2_en}</span>
+          </li>
+          <li>
+            <span className="text-slate-700">3. {i.guideStep3_th}</span>
+            <br />
+            <span className="text-slate-400">&nbsp;&nbsp;&nbsp;{i.guideStep3_en}</span>
+          </li>
+        </ol>
+        <p className="mt-2 text-[11px] text-amber-700">
+          <span>💡 {i.guideTip_th}</span>
+          <br />
+          <span className="text-slate-400">&nbsp;&nbsp;&nbsp;{i.guideTip_en}</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function EditorPropertiesPanel() {
   const { activeTool } = useEditor();
+
+  if (activeTool === "cloneStamp") {
+    return <CloneStampPanel />;
+  }
 
   if (activeTool === "manualTranslate") {
     return <ManualTranslatePanel />;
