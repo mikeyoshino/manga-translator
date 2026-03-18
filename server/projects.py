@@ -3,6 +3,7 @@
 import base64
 import logging
 import uuid
+from collections import defaultdict
 
 from server.supabase_client import _get_client
 
@@ -20,6 +21,24 @@ def _sign_url(client, path: str, expires_in: int = 86400) -> str:
     """Generate a signed URL valid for 24 hours."""
     result = _storage(client).create_signed_url(path, expires_in)
     return result["signedURL"]
+
+
+def _sign_urls_batch(client, paths: list[str], expires_in: int = 86400) -> dict[str, str | None]:
+    """Generate signed URLs for multiple paths in a single API call.
+
+    Returns a dict mapping each input path to its signed URL (or None on error).
+    """
+    if not paths:
+        return {}
+    results = _storage(client).create_signed_urls(paths, expires_in)
+    url_map: dict[str, str | None] = {}
+    for item in results:
+        path = item.get("path", "")
+        if item.get("error"):
+            url_map[path] = None
+        else:
+            url_map[path] = item.get("signedURL") or item.get("signedUrl")
+    return url_map
 
 
 def _base_path(user_id: str, project_id: str) -> str:
@@ -49,16 +68,36 @@ def list_projects(user_id: str) -> list[dict]:
     projects = client.table("projects").select("*") \
         .eq("user_id", user_id).gt("expires_at", "now()") \
         .order("updated_at", desc=True).execute()
+    if not projects.data:
+        return []
+
+    # Fetch all images for all projects in a single query instead of N+1
+    project_ids = [p["id"] for p in projects.data]
+    all_images = client.table("project_images") \
+        .select("project_id, original_image_path, sequence") \
+        .in_("project_id", project_ids) \
+        .order("sequence") \
+        .execute()
+
+    # Build per-project: count + first image path
+    project_image_counts: dict[str, int] = defaultdict(int)
+    project_first_image: dict[str, str | None] = {}
+    for img in all_images.data:
+        pid = img["project_id"]
+        project_image_counts[pid] += 1
+        if pid not in project_first_image:
+            project_first_image[pid] = img["original_image_path"]
+
+    # Batch sign all thumbnail paths in one call
+    thumb_paths = [path for path in project_first_image.values() if path]
+    url_map = _sign_urls_batch(client, thumb_paths) if thumb_paths else {}
+
     for p in projects.data:
-        imgs = client.table("project_images").select("id, original_image_path", count="exact") \
-            .eq("project_id", p["id"]).order("sequence").limit(1).execute()
-        p["image_count"] = imgs.count
-        p["thumbnail_url"] = None
-        if imgs.data:
-            try:
-                p["thumbnail_url"] = _sign_url(client, imgs.data[0]["original_image_path"])
-            except Exception:
-                pass
+        pid = p["id"]
+        p["image_count"] = project_image_counts[pid]
+        first_path = project_first_image.get(pid)
+        p["thumbnail_url"] = url_map.get(first_path) if first_path else None
+
     return projects.data
 
 
@@ -70,28 +109,35 @@ def get_project(project_id: str, user_id: str) -> dict | None:
         return None
     images = client.table("project_images").select("*") \
         .eq("project_id", project_id).order("sequence").execute()
+
+    # Collect all paths that need signing
+    paths_to_sign: list[str] = []
     for img in images.data:
-        try:
-            img["original_image_url"] = _sign_url(client, img["original_image_path"])
-        except Exception:
-            img["original_image_url"] = None
+        paths_to_sign.append(img["original_image_path"])
         if img.get("inpainted_image_path"):
-            try:
-                img["inpainted_image_url"] = _sign_url(client, img["inpainted_image_path"])
-            except Exception:
-                img["inpainted_image_url"] = None
+            paths_to_sign.append(img["inpainted_image_path"])
         if img.get("rendered_image_path"):
-            try:
-                img["rendered_image_url"] = _sign_url(client, img["rendered_image_path"])
-            except Exception:
-                img["rendered_image_url"] = None
+            paths_to_sign.append(img["rendered_image_path"])
         if img.get("translation_metadata"):
             for t in img["translation_metadata"].get("translations", []):
                 if t.get("background_path"):
-                    try:
-                        t["background_url"] = _sign_url(client, t["background_path"])
-                    except Exception:
-                        pass
+                    paths_to_sign.append(t["background_path"])
+
+    # Batch sign all paths in one API call
+    url_map = _sign_urls_batch(client, paths_to_sign)
+
+    # Map signed URLs back to images
+    for img in images.data:
+        img["original_image_url"] = url_map.get(img["original_image_path"])
+        if img.get("inpainted_image_path"):
+            img["inpainted_image_url"] = url_map.get(img["inpainted_image_path"])
+        if img.get("rendered_image_path"):
+            img["rendered_image_url"] = url_map.get(img["rendered_image_path"])
+        if img.get("translation_metadata"):
+            for t in img["translation_metadata"].get("translations", []):
+                if t.get("background_path"):
+                    t["background_url"] = url_map.get(t["background_path"])
+
     return {"project": proj.data, "images": images.data}
 
 
@@ -164,18 +210,32 @@ def get_image_with_urls(image_id: str) -> dict:
     client = _get_client()
     img = client.table("project_images").select("*").eq("id", image_id).single().execute()
     row = img.data
-    row["original_image_url"] = _sign_url(client, row["original_image_path"])
+
+    # Collect all paths that need signing
+    paths_to_sign: list[str] = [row["original_image_path"]]
     if row.get("inpainted_image_path"):
-        row["inpainted_image_url"] = _sign_url(client, row["inpainted_image_path"])
+        paths_to_sign.append(row["inpainted_image_path"])
     if row.get("rendered_image_path"):
-        row["rendered_image_url"] = _sign_url(client, row["rendered_image_path"])
+        paths_to_sign.append(row["rendered_image_path"])
     if row.get("translation_metadata"):
         for t in row["translation_metadata"].get("translations", []):
             if t.get("background_path"):
-                try:
-                    t["background_url"] = _sign_url(client, t["background_path"])
-                except Exception:
-                    pass
+                paths_to_sign.append(t["background_path"])
+
+    # Batch sign all paths in one API call
+    url_map = _sign_urls_batch(client, paths_to_sign)
+
+    # Map signed URLs back
+    row["original_image_url"] = url_map.get(row["original_image_path"])
+    if row.get("inpainted_image_path"):
+        row["inpainted_image_url"] = url_map.get(row["inpainted_image_path"])
+    if row.get("rendered_image_path"):
+        row["rendered_image_url"] = url_map.get(row["rendered_image_path"])
+    if row.get("translation_metadata"):
+        for t in row["translation_metadata"].get("translations", []):
+            if t.get("background_path"):
+                t["background_url"] = url_map.get(t["background_path"])
+
     return row
 
 
