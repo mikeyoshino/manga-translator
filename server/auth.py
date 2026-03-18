@@ -11,6 +11,8 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 ADMIN_EMAILS = {e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()}
 
+_auth_client = None
+
 
 class AuthUser(BaseModel):
     id: str          # UUID from Supabase auth.users
@@ -36,8 +38,10 @@ async def get_current_user(request: Request) -> AuthUser:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
     try:
-        client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-        user_response = client.auth.get_user(token)
+        global _auth_client
+        if _auth_client is None:
+            _auth_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+        user_response = _auth_client.auth.get_user(token)
         user = user_response.user
         if not user:
             raise HTTPException(status_code=401, detail="Invalid token")

@@ -508,6 +508,18 @@ class MangaTranslator:
             ctx.result = ctx.upscaled
             return await self._revert_upscale(config, ctx)
 
+        # Auto-detect source language from OCR results if not already set
+        if not ctx.from_lang or ctx.from_lang == 'auto':
+            try:
+                all_text = '\n'.join(t.text for t in ctx.textlines if t.text.strip())
+                if all_text:
+                    detected_lang = langid.classify(all_text)[0]
+                    from manga_translator.translators.common import ISO_639_1_TO_VALID_LANGUAGES
+                    ctx.from_lang = ISO_639_1_TO_VALID_LANGUAGES.get(detected_lang, 'auto')
+                    logger.info(f'Auto-detected source language: {ctx.from_lang} (from langid: {detected_lang})')
+            except Exception:
+                ctx.from_lang = 'auto'
+
         # -- Textline merge
         await self._report_progress('textline_merge')
         try:

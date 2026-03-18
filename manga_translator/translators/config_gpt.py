@@ -53,7 +53,7 @@ class ConfigGPT:
         
         '## Translation Rules\n'  
         '- Translate line by line, maintaining accuracy and the authentic; Faithfully reproducing the original text and emotional intent.\n'          
-        '- Preserve original gibberish or sound effects without translation.\n'            
+        '- Only leave text unchanged if it is already in {to_lang}. Translate all other text including sound effects and onomatopoeia into {to_lang}.\n'            
         '- Output each segment with its prefix (<|number|> format exactly) and only provide the translation without raw text.\n'  
         '- Translate content only—no additional interpretation or commentary.\n'  
         
@@ -190,8 +190,8 @@ class ConfigGPT:
     _JSON_MODE=False
 
     _PROMPT_TEMPLATE = ('Please help me to translate the following text from a manga to {to_lang}. '
-                        'If it\'s already in {to_lang} or looks like gibberish '
-                        'you have to output it as it is instead. Keep prefix format.\n'
+                        'If it\'s already in {to_lang} '
+                        'you have to output it as it is instead. Translate all other text. Keep prefix format.\n'
                     )
                     
     _GLOSSARY_SYSTEM_TEMPLATE = (  
