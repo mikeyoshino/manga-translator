@@ -152,6 +152,7 @@ class OpenAITranslator(ConfigGPT, CommonTranslator):
             1. 把 queries 拆成多个 prompt 批次
             2. 对每个批次调用 translate_batch，并将结果写回 translations
         """
+        self._current_from_lang = from_lang
         translations = [''] * len(queries)
         # 记录当前处理到 queries 列表的哪个位置
         idx_offset = 0
@@ -666,11 +667,17 @@ class OpenAITranslator(ConfigGPT, CommonTranslator):
         Incorporate the glossary function.
         """        
         lang_name = self._LANGUAGE_CODE_MAP.get(to_lang, to_lang) if to_lang in self._LANGUAGE_CODE_MAP else to_lang
-                
+
         # 构建 messages / Construct messages
-        messages = [  
-            {'role': 'system', 'content': self.chat_system_template.format(to_lang=lang_name)},  
-        ]  
+        messages = [
+            {'role': 'system', 'content': self.chat_system_template.format(to_lang=lang_name)},
+        ]
+
+        # Add source language context so the model knows what language the input is in
+        from_lang = getattr(self, '_current_from_lang', None)
+        if from_lang and from_lang != 'auto':
+            from_lang_name = self._LANGUAGE_CODE_MAP.get(from_lang, from_lang)
+            messages.append({'role': 'system', 'content': f'The source text is in {from_lang_name}. You MUST translate it into {lang_name}.'})
 
         # 提取相关术语并添加到系统消息中  / Extract relevant terms and add them to the system message
         has_glossary = False  # 添加标志表示是否有术语表 / Add a flag to indicate whether there is a glossary

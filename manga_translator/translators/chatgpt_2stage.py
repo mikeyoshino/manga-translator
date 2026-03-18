@@ -335,6 +335,7 @@ class ChatGPT2StageTranslator(OpenAITranslator):
         """
         Override the base translate method to implement 2-stage translation
         """
+        self._current_from_lang = from_lang
         if not queries:
             return queries
 
@@ -789,15 +790,21 @@ class ChatGPT2StageTranslator(OpenAITranslator):
         重写父类的_request_translation方法，在第二阶段翻译时发送图片
         """
         lang_name = self._LANGUAGE_CODE_MAP.get(to_lang, to_lang) if to_lang in self._LANGUAGE_CODE_MAP else to_lang
-                
+
         # 构建 messages / Construct messages
-        messages = [  
-            {'role': 'system', 'content': self.chat_system_template.format(to_lang=lang_name)},  
-        ]  
+        messages = [
+            {'role': 'system', 'content': self.chat_system_template.format(to_lang=lang_name)},
+        ]
+
+        # Add source language context so the model knows what language the input is in
+        from_lang = getattr(self, '_current_from_lang', None)
+        if from_lang and from_lang != 'auto':
+            from_lang_name = self._LANGUAGE_CODE_MAP.get(from_lang, from_lang)
+            messages.append({'role': 'system', 'content': f'The source text is in {from_lang_name}. You MUST translate it into {lang_name}.'})
 
         # 提取相关术语并添加到系统消息中  / Extract relevant terms and add them to the system message
         has_glossary = False  # 添加标志表示是否有术语表 / Add a flag to indicate whether there is a glossary
-        relevant_terms = self.extract_relevant_terms(prompt)  
+        relevant_terms = self.extract_relevant_terms(prompt)
         if relevant_terms:  
             has_glossary = True  # 设置标志 / Set the flag
             # 构建术语表字符串 / Construct the glossary string
