@@ -1,9 +1,12 @@
 """Project CRUD and Supabase Storage operations for image persistence."""
 
 import base64
+import io
 import logging
 import uuid
 from collections import defaultdict
+
+from PIL import Image
 
 from server.supabase_client import _get_client
 
@@ -43,6 +46,26 @@ def _sign_urls_batch(client, paths: list[str], expires_in: int = 86400) -> dict[
 
 def _base_path(user_id: str, project_id: str) -> str:
     return f"{user_id}/{project_id}"
+
+
+def _thumb_path_from_original(original_path: str) -> str:
+    """Derive thumbnail storage path from an original image path.
+
+    ``originals/{image_id}.{ext}`` → ``thumbnails/{image_id}.webp``
+    """
+    base, filename = original_path.rsplit("/", 1)
+    image_id = filename.rsplit(".", 1)[0]
+    parent = base.rsplit("/", 1)[0]  # strip "originals"
+    return f"{parent}/thumbnails/{image_id}.webp"
+
+
+def _generate_thumbnail(file_bytes: bytes, max_size: int = 400, quality: int = 70) -> bytes:
+    """Resize image to fit within *max_size* px and return as WebP bytes."""
+    img = Image.open(io.BytesIO(file_bytes))
+    img.thumbnail((max_size, max_size))
+    buf = io.BytesIO()
+    img.save(buf, format="WEBP", quality=quality)
+    return buf.getvalue()
 
 
 def _decode_base64_image(data_uri_or_b64: str) -> bytes:
@@ -88,15 +111,29 @@ def list_projects(user_id: str) -> list[dict]:
         if pid not in project_first_image:
             project_first_image[pid] = img["original_image_path"]
 
-    # Batch sign all thumbnail paths in one call
-    thumb_paths = [path for path in project_first_image.values() if path]
-    url_map = _sign_urls_batch(client, thumb_paths) if thumb_paths else {}
+    # Prefer small thumbnails; fall back to originals for older uploads
+    thumb_map: dict[str, str] = {}  # project_id → path to sign
+    for pid, orig_path in project_first_image.items():
+        if orig_path:
+            thumb_map[pid] = _thumb_path_from_original(orig_path)
+
+    paths_to_sign = list(thumb_map.values())
+    # Also include originals as fallback
+    orig_paths = [p for p in project_first_image.values() if p]
+    paths_to_sign.extend(orig_paths)
+    url_map = _sign_urls_batch(client, paths_to_sign) if paths_to_sign else {}
 
     for p in projects.data:
         pid = p["id"]
         p["image_count"] = project_image_counts[pid]
-        first_path = project_first_image.get(pid)
-        p["thumbnail_url"] = url_map.get(first_path) if first_path else None
+        thumb_p = thumb_map.get(pid)
+        orig_p = project_first_image.get(pid)
+        # Use thumbnail URL if available, otherwise fall back to original
+        p["thumbnail_url"] = (
+            url_map.get(thumb_p) if thumb_p and url_map.get(thumb_p)
+            else url_map.get(orig_p) if orig_p
+            else None
+        )
 
     return projects.data
 
@@ -146,8 +183,19 @@ def upload_image(project_id: str, user_id: str, file_bytes: bytes, filename: str
     client = _get_client()
     image_id = str(uuid.uuid4())
     ext = filename.rsplit(".", 1)[-1] if "." in filename else "png"
-    path = f"{_base_path(user_id, project_id)}/originals/{image_id}.{ext}"
-    _storage(client).upload(path, file_bytes, {"content-type": content_type})
+    base = _base_path(user_id, project_id)
+    path = f"{base}/originals/{image_id}.{ext}"
+    storage = _storage(client)
+    storage.upload(path, file_bytes, {"content-type": content_type})
+
+    # Generate and upload a small thumbnail for the project list
+    try:
+        thumb_bytes = _generate_thumbnail(file_bytes)
+        thumb_path = f"{base}/thumbnails/{image_id}.webp"
+        storage.upload(thumb_path, thumb_bytes, {"content-type": "image/webp"})
+    except Exception as e:
+        logger.warning("Failed to generate thumbnail for image %s: %s", image_id, e)
+
     result = client.table("project_images").insert({
         "id": image_id, "project_id": project_id, "sequence": sequence,
         "original_filename": filename, "original_image_path": path,
@@ -260,7 +308,7 @@ def delete_project(project_id: str, user_id: str):
     client = _get_client()
     base = _base_path(user_id, project_id)
     storage = _storage(client)
-    for folder in ["originals", "results", "backgrounds"]:
+    for folder in ["originals", "results", "backgrounds", "thumbnails"]:
         try:
             files = storage.list(f"{base}/{folder}")
             if files:
@@ -284,6 +332,12 @@ def delete_image(image_id: str, user_id: str):
                 storage.remove([img.data[path_field]])
             except Exception as e:
                 logger.warning("Failed to delete storage file %s: %s", img.data[path_field], e)
+    # Delete thumbnail
+    if img.data.get("original_image_path"):
+        try:
+            storage.remove([_thumb_path_from_original(img.data["original_image_path"])])
+        except Exception as e:
+            logger.warning("Failed to delete thumbnail for image %s: %s", image_id, e)
     # Delete background files via metadata (fast path)
     if img.data.get("translation_metadata"):
         for t in img.data["translation_metadata"].get("translations", []):

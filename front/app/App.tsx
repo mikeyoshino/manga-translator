@@ -316,7 +316,7 @@ export const App: React.FC = () => {
                     {/* Thumbnail */}
                     <div className="h-40 bg-slate-100 flex items-center justify-center overflow-hidden">
                       {project.thumbnail_url ? (
-                        <img src={project.thumbnail_url} alt={project.name} className="w-full h-full object-cover" />
+                        <img src={project.thumbnail_url} alt={project.name} loading="lazy" className="w-full h-full object-cover" />
                       ) : (
                         <FolderOpen className="w-10 h-10 text-slate-300" />
                       )}
