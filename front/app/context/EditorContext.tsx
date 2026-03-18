@@ -396,12 +396,15 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         const fullCtx = fullCanvas.getContext("2d")!;
         fullCtx.drawImage(bgImg, 0, 0);
 
-        // Decode inpainted crop (base64)
+        // Decode inpainted crop (base64 or data URI)
+        const inpaintedSrc = result.inpainted_image!.startsWith("data:")
+          ? result.inpainted_image!
+          : `data:image/png;base64,${result.inpainted_image}`;
         const inpaintedImg = await new Promise<HTMLImageElement>((resolve, reject) => {
           const el = new window.Image();
           el.onload = () => resolve(el);
-          el.onerror = reject;
-          el.src = `data:image/png;base64,${result.inpainted_image}`;
+          el.onerror = () => reject(new Error("Failed to decode inpainted image"));
+          el.src = inpaintedSrc;
         });
         fullCtx.drawImage(inpaintedImg, rect.x, rect.y, rect.width, rect.height);
 
