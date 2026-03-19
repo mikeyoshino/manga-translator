@@ -360,7 +360,7 @@ function TopUpContent() {
           <p className="text-sm text-slate-500 mb-2">{i.tokensCredited}</p>
           <p className="text-3xl font-bold text-indigo-600 mb-6">{tokenBalance} {i.tokens}</p>
           <div className="flex gap-3 justify-center">
-            <button onClick={() => navigate("/")} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors text-sm font-bold shadow-lg shadow-indigo-200">
+            <button onClick={() => navigate("/studio")} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors text-sm font-bold shadow-lg shadow-indigo-200">
               {i.startTranslating}
             </button>
             <button onClick={resetFlow} className="px-6 py-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors text-sm font-semibold">

@@ -266,7 +266,7 @@ function ProjectContent() {
         setProjectName(data.project.name);
         setProjectImages(data.images);
       })
-      .catch(() => navigate("/"))
+      .catch(() => navigate("/studio"))
       .finally(() => setLoadingProject(false));
   }, [user, projectId]);
 
@@ -331,7 +331,7 @@ function ProjectContent() {
     if (untranslatedImages.length === 0) return;
     if (!isAdmin && tokenBalance < untranslatedImages.length) {
       alert(i.insufficientTokens.replace("{need}", String(untranslatedImages.length)).replace("{have}", String(tokenBalance)));
-      navigate("/topup");
+      navigate("/studio/topup");
       return;
     }
     // Set up file statuses for untranslated images
@@ -468,7 +468,7 @@ function ProjectContent() {
       };
     });
     setEditorImages(editorImages);
-    navigate("/editor");
+    navigate("/studio/editor");
   };
 
   const getStatusBadge = (pi: ProjectImage) => {

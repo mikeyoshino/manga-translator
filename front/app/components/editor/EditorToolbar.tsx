@@ -18,7 +18,7 @@ export function EditorToolbar() {
   const locale = getEditorLocale();
   const i = editorT[locale];
 
-  const handleBack = () => navigate("/");
+  const handleBack = () => navigate("/studio");
 
   const handlePrev = () => {
     setSelectedBlockId(null);

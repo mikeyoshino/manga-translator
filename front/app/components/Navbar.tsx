@@ -75,7 +75,7 @@ export function Navbar({ showBack = false, showLanguageToggle = false, locale: l
       <div className="flex items-center gap-3">
         {showBack && (
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/studio")}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-4 h-4" /> {i.back}
@@ -105,7 +105,7 @@ export function Navbar({ showBack = false, showLanguageToggle = false, locale: l
           </div>
         ) : (
           <button
-            onClick={() => navigate("/topup")}
+            onClick={() => navigate("/studio/topup")}
             className="flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full hover:bg-emerald-100 transition-colors"
           >
             <Coins className="w-3.5 h-3.5 text-emerald-600" />
@@ -130,13 +130,13 @@ export function Navbar({ showBack = false, showLanguageToggle = false, locale: l
                 {isAdmin && <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded mt-1 inline-block">Admin</span>}
               </div>
               <div className="py-1">
-                <button onClick={() => { setProfileOpen(false); navigate("/profile"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                <button onClick={() => { setProfileOpen(false); navigate("/studio/profile"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                   <User className="w-4 h-4 text-slate-400" /> {i.profile}
                 </button>
-                <button onClick={() => { setProfileOpen(false); navigate("/topup"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                <button onClick={() => { setProfileOpen(false); navigate("/studio/topup"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                   <CreditCard className="w-4 h-4 text-slate-400" /> {i.subscription}
                 </button>
-                <button onClick={() => { setProfileOpen(false); navigate("/token-usage"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                <button onClick={() => { setProfileOpen(false); navigate("/studio/token-usage"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                   <BarChart3 className="w-4 h-4 text-slate-400" /> {i.tokenUsage}
                   <span className="ml-auto text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
                     {isAdmin ? "\u221e" : tokenBalance}

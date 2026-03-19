@@ -291,14 +291,14 @@ function ProfileContent() {
             <div className="flex gap-3">
               {!isAdmin && (
                 <button
-                  onClick={() => navigate("/topup")}
+                  onClick={() => navigate("/studio/topup")}
                   className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors"
                 >
                   <Coins className="w-4 h-4" /> {i.topUp}
                 </button>
               )}
               <button
-                onClick={() => navigate("/token-usage")}
+                onClick={() => navigate("/studio/token-usage")}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-200 transition-colors"
               >
                 <ExternalLink className="w-4 h-4" /> {i.viewUsage}

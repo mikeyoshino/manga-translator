@@ -133,7 +133,7 @@ export const App: React.FC = () => {
       const project = await res.json();
       setShowCreateModal(false);
       setNewProjectName("");
-      navigate(`/projects/${project.id}`);
+      navigate(`/studio/projects/${project.id}`);
     } catch {
       setCreateError("Network error");
     } finally {
@@ -214,7 +214,7 @@ export const App: React.FC = () => {
                 return (
                   <div
                     key={project.id}
-                    onClick={() => navigate(`/projects/${project.id}`)}
+                    onClick={() => navigate(`/studio/projects/${project.id}`)}
                     className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer group"
                   >
                     {/* Thumbnail */}
