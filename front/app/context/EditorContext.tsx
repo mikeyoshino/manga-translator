@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import Sentry from "@/lib/sentry";
 import { initEditableBlocksWithOffset } from "@/utils/initEditableBlocks";
 import { loadSettings } from "@/utils/localStorage";
+import { apiFetch } from "@/utils/api";
 
 export interface DrawingLine {
   points: number[];
@@ -110,7 +111,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   const [cloneStampSourceMap, setCloneStampSourceMap] = useState<Map<string, { x: number; y: number } | null>>(new Map());
   const [cloneStampStrokes, setCloneStampStrokes] = useState<Map<string, CloneStampStroke[]>>(new Map());
   const [isCloneStamping, setIsCloneStamping] = useState(false);
-  const { session } = useAuth();
+  const { user } = useAuth();
   const saveTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const imagesRef = useRef<EditorImage[]>([]);
   imagesRef.current = images;
@@ -176,15 +177,12 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
             ),
           };
           // Auto-save to backend if this is a persisted project image
-          if (updated.projectImageId && session?.access_token) {
+          if (updated.projectImageId && user) {
             clearTimeout(saveTimerRef.current[imageId]);
             saveTimerRef.current[imageId] = setTimeout(() => {
-              fetch(`/api/projects/_/images/${updated.projectImageId}/blocks`, {
+              apiFetch(`/api/projects/_/images/${updated.projectImageId}/blocks`, {
                 method: "PUT",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${session.access_token}`,
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ editable_blocks: updated.editableBlocks }),
               })
                 .then(() => {
@@ -199,7 +197,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         })
       );
     },
-    [session?.access_token]
+    [user]
   );
 
   // Public updateBlock - coalesces rapid edits to the same block into a single history entry
@@ -517,9 +515,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       fd.append("image", cropBlob, "crop.png");
       fd.append("config", config);
 
-      const resp = await fetch("/api/translate/with-form/json", {
+      const resp = await apiFetch("/api/translate/with-form/json", {
         method: "POST",
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
         body: fd,
       });
 
@@ -609,7 +606,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsManualTranslating(false);
     }
-  }, [manualTranslateRect, images, session?.access_token, pushAction, clearManualTranslateRect]);
+  }, [manualTranslateRect, images, pushAction, clearManualTranslateRect]);
 
   const applyMagicRemover = useCallback(async (imageId: string) => {
     const lines = magicRemoverLines.get(imageId);
@@ -672,9 +669,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       fd.append("mask", maskBlob, "mask.png");
       fd.append("inpainting_size", "2048");
 
-      const resp = await fetch("/api/inpaint", {
+      const resp = await apiFetch("/api/inpaint", {
         method: "POST",
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
         body: fd,
       });
 
@@ -732,7 +728,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsInpainting(false);
     }
-  }, [magicRemoverLines, images, session?.access_token, pushAction]);
+  }, [magicRemoverLines, images, pushAction]);
 
   const undoMagicRemover = useCallback((imageId: string) => {
     const stack = imageHistory.get(imageId);

@@ -116,7 +116,7 @@ export function EditorToolbar() {
           title={i.magicRemover}
           className={`p-1.5 rounded-lg transition-colors ${
             activeTool === "magicRemover"
-              ? "bg-fuchsia-600 text-white"
+              ? "bg-indigo-600 text-white"
               : "bg-slate-100 text-slate-600 hover:bg-slate-200"
           }`}
         >
@@ -127,7 +127,7 @@ export function EditorToolbar() {
           title={i.manualTranslate}
           className={`p-1.5 rounded-lg transition-colors ${
             activeTool === "manualTranslate"
-              ? "bg-teal-600 text-white"
+              ? "bg-indigo-600 text-white"
               : "bg-slate-100 text-slate-600 hover:bg-slate-200"
           }`}
         >
@@ -138,7 +138,7 @@ export function EditorToolbar() {
           title={i.cloneStamp}
           className={`p-1.5 rounded-lg transition-colors ${
             activeTool === "cloneStamp"
-              ? "bg-amber-600 text-white"
+              ? "bg-indigo-600 text-white"
               : "bg-slate-100 text-slate-600 hover:bg-slate-200"
           }`}
         >

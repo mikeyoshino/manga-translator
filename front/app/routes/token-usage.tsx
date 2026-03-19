@@ -2,10 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/context/AuthContext";
 import { AuthGuard } from "@/components/AuthGuard";
+import { Navbar } from "@/components/Navbar";
+import { apiFetch } from "@/utils/api";
 import {
-  BookOpen,
-  ArrowLeft,
-  BarChart3,
   Coins,
   ArrowUpCircle,
   Image,
@@ -88,7 +87,7 @@ const t = {
 const PAGE_SIZE = 20;
 
 function TokenUsageContent() {
-  const { session, tokenBalance, isAdmin } = useAuth();
+  const { user, tokenBalance, isAdmin } = useAuth();
   const navigate = useNavigate();
   const locale = (typeof window !== "undefined" ? localStorage.getItem("manga-translator-locale") as Locale : null) || "th";
   const i = t[locale];
@@ -99,11 +98,9 @@ function TokenUsageContent() {
   const [hasMore, setHasMore] = useState(true);
 
   const fetchTransactions = useCallback(async (offset: number, append: boolean) => {
-    if (!session?.access_token) return;
+    if (!user) return;
     try {
-      const res = await fetch(`/api/user/transactions?limit=${PAGE_SIZE}&offset=${offset}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+      const res = await apiFetch(`/api/user/transactions?limit=${PAGE_SIZE}&offset=${offset}`);
       if (!res.ok) return;
       const data: Transaction[] = await res.json();
       if (data.length < PAGE_SIZE) setHasMore(false);
@@ -111,7 +108,7 @@ function TokenUsageContent() {
     } catch {
       // silent
     }
-  }, [session?.access_token]);
+  }, [user]);
 
   useEffect(() => {
     setLoading(true);
@@ -282,31 +279,10 @@ export function HydrateFallback() {
 }
 
 export default function TokenUsagePage() {
-  const navigate = useNavigate();
-  const locale = (typeof window !== "undefined" ? localStorage.getItem("manga-translator-locale") as Locale : null) || "th";
-  const i = t[locale];
-
   return (
     <AuthGuard>
       <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
-        <header className="h-14 bg-white border-b border-slate-200 px-6 flex items-center gap-4 z-30 shrink-0">
-          <button
-            onClick={() => navigate("/")}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> {i.back}
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="bg-indigo-600 p-1.5 rounded-lg">
-              <BookOpen className="text-white w-5 h-5" />
-            </div>
-            <h1 className="text-lg font-bold tracking-tight text-slate-800">Manga Translator</h1>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-indigo-500" />
-            <span className="text-sm font-bold text-slate-700">{i.title}</span>
-          </div>
-        </header>
+        <Navbar showBack />
         <TokenUsageContent />
       </div>
     </AuthGuard>

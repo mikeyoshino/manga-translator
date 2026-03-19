@@ -2,8 +2,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/context/AuthContext";
 import { AuthGuard } from "@/components/AuthGuard";
+import { Navbar } from "@/components/Navbar";
+import { apiFetch } from "@/utils/api";
 import {
-  BookOpen,
   ArrowLeft,
   Coins,
   Sparkles,
@@ -141,7 +142,7 @@ declare global {
 }
 
 function TopUpContent() {
-  const { session, tokenBalance, isAdmin, refreshBalance } = useAuth();
+  const { tokenBalance, isAdmin, refreshBalance } = useAuth();
   const navigate = useNavigate();
   const locale = (typeof window !== "undefined" ? localStorage.getItem("manga-translator-locale") as Locale : null) || "th";
   const i = t[locale];
@@ -183,9 +184,9 @@ function TopUpContent() {
     pollInterval.current = setInterval(async () => {
       try {
         // Ask backend to check charge status with Omise (also credits tokens if successful)
-        const res = await fetch("/api/payment/check-charge", {
+        const res = await apiFetch("/api/payment/check-charge", {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ charge_id: chargeId }),
         });
         if (res.ok) {
@@ -207,7 +208,7 @@ function TopUpContent() {
     return () => {
       if (pollInterval.current) clearInterval(pollInterval.current);
     };
-  }, [polling, chargeId, session?.access_token, refreshBalance]);
+  }, [polling, chargeId, refreshBalance]);
 
   // Detect balance increase as fallback
   useEffect(() => {
@@ -249,9 +250,9 @@ function TopUpContent() {
     setLoading(true);
     setStep("processing");
     try {
-      const res = await fetch("/api/payment/create-charge", {
+      const res = await apiFetch("/api/payment/create-charge", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token_amount: selectedPackage, payment_method: "promptpay" }),
       });
       if (!res.ok) {
@@ -301,9 +302,9 @@ function TopUpContent() {
 
       setStep("processing");
 
-      const res = await fetch("/api/payment/create-charge", {
+      const res = await apiFetch("/api/payment/create-charge", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token_amount: selectedPackage, payment_method: "card", card_token: token }),
       });
       if (!res.ok) {
@@ -659,31 +660,10 @@ export function HydrateFallback() {
 }
 
 export default function TopUpPage() {
-  const navigate = useNavigate();
-  const locale = (typeof window !== "undefined" ? localStorage.getItem("manga-translator-locale") as Locale : null) || "th";
-  const i = t[locale];
-
   return (
     <AuthGuard>
       <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
-        <header className="h-14 bg-white border-b border-slate-200 px-6 flex items-center gap-4 z-30 shrink-0">
-          <button
-            onClick={() => navigate("/studio")}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> {i.back}
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="bg-indigo-600 p-1.5 rounded-lg">
-              <BookOpen className="text-white w-5 h-5" />
-            </div>
-            <h1 className="text-lg font-bold tracking-tight text-slate-800">Manga Translator</h1>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <Coins className="w-4 h-4 text-indigo-500" />
-            <span className="text-sm font-bold text-slate-700">{i.topUp}</span>
-          </div>
-        </header>
+        <Navbar showBack />
         <TopUpContent />
       </div>
     </AuthGuard>

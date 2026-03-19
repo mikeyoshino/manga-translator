@@ -447,7 +447,7 @@ function MagicRemoverPanel() {
 
   return (
     <div className="w-64 bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
-      <h3 className="text-sm font-bold mb-3 text-fuchsia-700">{i.magicRemover}</h3>
+      <h3 className="text-sm font-bold mb-3 text-indigo-700">{i.magicRemover}</h3>
 
       {/* Brush size */}
       <label className="block text-xs font-semibold text-slate-500 mb-1">{i.brushSize}</label>
@@ -485,7 +485,7 @@ function MagicRemoverPanel() {
       <button
         onClick={() => currentImage && applyMagicRemover(currentImage.id)}
         disabled={isInpainting || currentLines.length === 0}
-        className="w-full py-2 text-sm font-bold text-white bg-fuchsia-600 hover:bg-fuchsia-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-2"
+        className="w-full py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-2"
       >
         {isInpainting ? (
           <>
@@ -526,7 +526,7 @@ function ManualTranslatePanel() {
 
   return (
     <div className="w-64 bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
-      <h3 className="text-sm font-bold mb-3 text-teal-700">{i.manualTranslate}</h3>
+      <h3 className="text-sm font-bold mb-3 text-indigo-700">{i.manualTranslate}</h3>
 
       {!rect ? (
         <p className="text-xs text-slate-500">{i.manualTranslateHint}</p>
@@ -552,7 +552,7 @@ function ManualTranslatePanel() {
           <button
             onClick={() => currentImage && applyManualTranslate(currentImage.id)}
             disabled={isManualTranslating}
-            className="w-full py-2 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-2"
+            className="w-full py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
             {isManualTranslating ? (
               <>
@@ -594,7 +594,7 @@ function CloneStampPanel() {
 
   return (
     <div className="w-64 bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
-      <h3 className="text-sm font-bold mb-3 text-amber-700">{i.cloneStamp}</h3>
+      <h3 className="text-sm font-bold mb-3 text-indigo-700">{i.cloneStamp}</h3>
 
       {/* Source point */}
       <label className="block text-xs font-semibold text-slate-500 mb-1">{i.sourcePoint}</label>
@@ -663,7 +663,7 @@ function CloneStampPanel() {
       <button
         onClick={() => currentImage && applyCloneStamp(currentImage.id)}
         disabled={isCloneStamping || strokes.length === 0}
-        className="w-full py-2 text-sm font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-2"
+        className="w-full py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-2"
       >
         {isCloneStamping ? (
           <>
@@ -679,8 +679,8 @@ function CloneStampPanel() {
       </button>
 
       {/* Bilingual guide */}
-      <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
-        <p className="text-xs font-bold text-amber-800 mb-2">{i.guideTitle}</p>
+      <div className="mt-4 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+        <p className="text-xs font-bold text-indigo-800 mb-2">{i.guideTitle}</p>
         <ol className="space-y-2 text-xs">
           <li>
             <span className="text-slate-700">1. {i.guideStep1_th}</span>
@@ -698,7 +698,7 @@ function CloneStampPanel() {
             <span className="text-slate-400">&nbsp;&nbsp;&nbsp;{i.guideStep3_en}</span>
           </li>
         </ol>
-        <p className="mt-2 text-[11px] text-amber-700">
+        <p className="mt-2 text-[11px] text-indigo-700">
           <span>💡 {i.guideTip_th}</span>
           <br />
           <span className="text-slate-400">&nbsp;&nbsp;&nbsp;{i.guideTip_en}</span>

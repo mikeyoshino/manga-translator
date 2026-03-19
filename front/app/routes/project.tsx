@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
+import { Navbar } from "@/components/Navbar";
 import {
-  BookOpen,
-  ArrowLeft,
   Settings2,
   Upload,
   Image as ImageIcon,
@@ -16,12 +15,6 @@ import {
   Layers,
   AlertCircle,
   ExternalLink,
-  User,
-  Coins,
-  ChevronDown,
-  CreditCard,
-  BarChart3,
-  LogOut,
   Info,
 } from "lucide-react";
 import {
@@ -47,6 +40,7 @@ import { initEditableBlocks } from "@/utils/initEditableBlocks";
 import { useEditor } from "@/context/EditorContext";
 import { useAuth } from "@/context/AuthContext";
 import { AuthGuard } from "@/components/AuthGuard";
+import { apiFetch } from "@/utils/api";
 
 export const clientLoader = async () => null;
 clientLoader.hydrate = true as const;
@@ -197,7 +191,7 @@ function ProjectContent() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const { setImages: setEditorImages } = useEditor();
-  const { session, tokenBalance, isAdmin, refreshBalance } = useAuth();
+  const { user, tokenBalance, isAdmin, refreshBalance } = useAuth();
 
   const [locale] = useState<Locale>(() => (localStorage.getItem("manga-translator-locale") as Locale) || "th");
   const i = t[locale];
@@ -257,15 +251,13 @@ function ProjectContent() {
     };
     window.addEventListener("paste", handlePaste as EventListener);
     return () => window.removeEventListener("paste", handlePaste as EventListener);
-  }, [session?.access_token, projectId]);
+  }, [user, projectId]);
 
   // Load project
   useEffect(() => {
-    if (!session?.access_token || !projectId) return;
+    if (!user || !projectId) return;
     setLoadingProject(true);
-    fetch(`/api/projects/${projectId}`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    })
+    apiFetch(`/api/projects/${projectId}`)
       .then((res) => {
         if (!res.ok) throw new Error("Not found");
         return res.json();
@@ -276,7 +268,7 @@ function ProjectContent() {
       })
       .catch(() => navigate("/studio"))
       .finally(() => setLoadingProject(false));
-  }, [session?.access_token, projectId]);
+  }, [user, projectId]);
 
   useEffect(() => {
     if (shouldTranslate) {
@@ -287,14 +279,13 @@ function ProjectContent() {
 
   // Upload files to project
   const handleUploadFiles = async (files: File[]) => {
-    if (!session?.access_token || !projectId || files.length === 0) return;
+    if (!user || !projectId || files.length === 0) return;
     setUploading(true);
     try {
       const formData = new FormData();
       files.forEach((f) => formData.append("images", f));
-      const res = await fetch(`/api/projects/${projectId}/images`, {
+      const res = await apiFetch(`/api/projects/${projectId}/images`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${session.access_token}` },
         body: formData,
       });
       if (res.ok) {
@@ -321,11 +312,10 @@ function ProjectContent() {
   };
 
   const removeImage = async (imageId: string) => {
-    if (!session?.access_token || !projectId) return;
+    if (!user || !projectId) return;
     try {
-      await fetch(`/api/projects/${projectId}/images/${imageId}`, {
+      await apiFetch(`/api/projects/${projectId}/images/${imageId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       setProjectImages((prev) => prev.filter((pi) => pi.id !== imageId));
     } catch { /* silent */ }
@@ -377,10 +367,8 @@ function ProjectContent() {
     } finally {
       refreshBalance();
       // Reload project to get updated image data with signed URLs
-      if (session?.access_token && projectId) {
-        const res = await fetch(`/api/projects/${projectId}`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
+      if (user && projectId) {
+        const res = await apiFetch(`/api/projects/${projectId}`);
         if (res.ok) {
           const data = await res.json();
           setProjectImages(data.images);
@@ -393,9 +381,8 @@ function ProjectContent() {
     try {
       const formData = new FormData();
       formData.append("config", config);
-      const response = await fetch(`/api/projects/${projectId}/images/${pi.id}/translate`, {
+      const response = await apiFetch(`/api/projects/${projectId}/images/${pi.id}/translate`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${session!.access_token}` },
         body: formData,
       });
       if (response.status === 402) throw new Error("Insufficient tokens");
@@ -427,22 +414,17 @@ function ProjectContent() {
               try { parsed = JSON.parse(decoded); } catch { break; }
               updateFileStatus(pi.id, { status: "finished" });
               // Save result to project storage via backend
-              if (session?.access_token) {
-                try {
-                  const edBlocks = initEditableBlocks(parsed.translations, targetLanguage);
-                  await fetch(`/api/projects/${projectId}/images/${pi.id}/save-result`, {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      Authorization: `Bearer ${session.access_token}`,
-                    },
-                    body: JSON.stringify({
-                      translation_response: parsed,
-                      editable_blocks: edBlocks,
-                    }),
-                  });
-                } catch { /* silent */ }
-              }
+              try {
+                const edBlocks = initEditableBlocks(parsed.translations, targetLanguage);
+                await apiFetch(`/api/projects/${projectId}/images/${pi.id}/save-result`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    translation_response: parsed,
+                    editable_blocks: edBlocks,
+                  }),
+                });
+              } catch { /* silent */ }
               break;
             }
             case 1: updateFileStatus(pi.id, { status: decoded as StatusKey }); break;
@@ -737,98 +719,10 @@ function SliderInput({ label, value, min, max, step, onChange, hint }: {
 }
 
 export default function ProjectPage() {
-  const navigate = useNavigate();
-  const { user, tokenBalance, isAdmin, signOut } = useAuth();
-  const locale = (typeof window !== "undefined" ? localStorage.getItem("manga-translator-locale") as Locale : null) || "th";
-  const i = t[locale];
-
-  const [profileOpen, setProfileOpen] = useState(false);
-  const profileRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/login");
-  };
-
   return (
     <AuthGuard>
       <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
-        <header className="h-14 bg-white border-b border-slate-200 px-6 flex items-center gap-4 z-30 shrink-0">
-          <button
-            onClick={() => navigate("/studio")}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> {i.back}
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="bg-indigo-600 p-1.5 rounded-lg">
-              <BookOpen className="text-white w-5 h-5" />
-            </div>
-            <h1 className="text-lg font-bold tracking-tight text-slate-800">Manga Translator</h1>
-          </div>
-          <div className="ml-auto flex items-center gap-4">
-            {isAdmin ? (
-              <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-100 rounded-full">
-                <Coins className="w-3.5 h-3.5 text-amber-600" />
-                <span className="text-xs font-semibold text-amber-700">{i.adminUnlimited}</span>
-              </div>
-            ) : (
-              <button
-                onClick={() => navigate("/studio/topup")}
-                className="flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full hover:bg-emerald-100 transition-colors"
-              >
-                <Coins className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="text-xs font-semibold text-emerald-700">{tokenBalance} {i.tokens}</span>
-              </button>
-            )}
-            <div className="h-6 w-px bg-slate-200" />
-            <div ref={profileRef} className="relative">
-              <button
-                onClick={() => setProfileOpen((v) => !v)}
-                className="flex items-center gap-1.5 p-1 hover:bg-slate-100 rounded-full transition-colors"
-              >
-                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                  <User className="w-4 h-4 text-indigo-600" />
-                </div>
-                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${profileOpen ? "rotate-180" : ""}`} />
-              </button>
-              {profileOpen && (
-                <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg py-2 z-50">
-                  <div className="px-4 py-2 border-b border-slate-100">
-                    <p className="text-sm font-semibold text-slate-700 truncate">{user?.email}</p>
-                    {isAdmin && <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded mt-1 inline-block">Admin</span>}
-                  </div>
-                  <div className="py-1">
-                    <button onClick={() => { setProfileOpen(false); navigate("/studio/profile"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
-                      <User className="w-4 h-4 text-slate-400" /> {i.profile}
-                    </button>
-                    <button onClick={() => { setProfileOpen(false); navigate("/studio/topup"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
-                      <CreditCard className="w-4 h-4 text-slate-400" /> {i.subscription}
-                    </button>
-                    <button onClick={() => { setProfileOpen(false); navigate("/studio/token-usage"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
-                      <BarChart3 className="w-4 h-4 text-slate-400" /> {i.tokenUsage}
-                      <span className="ml-auto text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                        {isAdmin ? "\u221e" : tokenBalance}
-                      </span>
-                    </button>
-                  </div>
-                  <div className="border-t border-slate-100 py-1">
-                    <button onClick={() => { setProfileOpen(false); handleSignOut(); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors">
-                      <LogOut className="w-4 h-4" /> {i.signOut}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
+        <Navbar showBack />
         <ProjectContent />
       </div>
     </AuthGuard>
