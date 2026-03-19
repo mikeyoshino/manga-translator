@@ -153,7 +153,7 @@ export const App: React.FC = () => {
       const project = await res.json();
       setShowCreateModal(false);
       setNewProjectName("");
-      navigate(`/projects/${project.id}`);
+      navigate(`/studio/projects/${project.id}`);
     } catch {
       setCreateError("Network error");
     } finally {
@@ -212,7 +212,7 @@ export const App: React.FC = () => {
             </div>
           ) : (
             <button
-              onClick={() => navigate("/topup")}
+              onClick={() => navigate("/studio/topup")}
               className="flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full hover:bg-emerald-100 transition-colors"
             >
               <Coins className="w-3.5 h-3.5 text-emerald-600" />
@@ -237,13 +237,13 @@ export const App: React.FC = () => {
                   {isAdmin && <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded mt-1 inline-block">Admin</span>}
                 </div>
                 <div className="py-1">
-                  <button onClick={() => { setProfileOpen(false); navigate("/profile"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                  <button onClick={() => { setProfileOpen(false); navigate("/studio/profile"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                     <User className="w-4 h-4 text-slate-400" /> {i.profile}
                   </button>
-                  <button onClick={() => { setProfileOpen(false); navigate("/topup"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                  <button onClick={() => { setProfileOpen(false); navigate("/studio/topup"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                     <CreditCard className="w-4 h-4 text-slate-400" /> {i.subscription}
                   </button>
-                  <button onClick={() => { setProfileOpen(false); navigate("/token-usage"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                  <button onClick={() => { setProfileOpen(false); navigate("/studio/token-usage"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                     <BarChart3 className="w-4 h-4 text-slate-400" /> {i.tokenUsage}
                     <span className="ml-auto text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
                       {isAdmin ? "\u221e" : tokenBalance}
@@ -310,7 +310,7 @@ export const App: React.FC = () => {
                 return (
                   <div
                     key={project.id}
-                    onClick={() => navigate(`/projects/${project.id}`)}
+                    onClick={() => navigate(`/studio/projects/${project.id}`)}
                     className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer group"
                   >
                     {/* Thumbnail */}

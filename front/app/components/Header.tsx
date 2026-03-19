@@ -30,7 +30,7 @@ export const Header: React.FC<Props> = () => {
             </div>
             <div className="sm:ml-6 sm:flex sm:space-x-8">
               <a
-                href="/"
+                href="/studio"
                 className="inline-flex items-center px-1 pt-1 font-medium text-gray-900"
               >
                 Manga Translator
@@ -47,7 +47,7 @@ export const Header: React.FC<Props> = () => {
                 </span>
               ) : (
                 <button
-                  onClick={() => navigate("/topup")}
+                  onClick={() => navigate("/studio/topup")}
                   className="flex items-center space-x-1 px-3 py-1.5 bg-teal-50 text-teal-700 rounded-full hover:bg-teal-100 transition-colors text-sm font-medium"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">

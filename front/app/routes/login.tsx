@@ -16,7 +16,7 @@ export default function LoginPage() {
 
   // Redirect if already logged in
   if (user) {
-    navigate("/");
+    navigate("/studio");
     return null;
   }
 
@@ -38,7 +38,7 @@ export default function LoginPage() {
         if (err) {
           setError(err.message);
         } else {
-          navigate("/");
+          navigate("/studio");
         }
       }
     } finally {

@@ -69,7 +69,7 @@ function EditorContent() {
 
   useEffect(() => {
     if (isClient && images.length === 0) {
-      navigate("/");
+      navigate("/studio");
     }
   }, [images, navigate, isClient]);
 

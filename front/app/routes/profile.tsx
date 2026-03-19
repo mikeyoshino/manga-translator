@@ -293,14 +293,14 @@ function ProfileContent() {
             <div className="flex gap-3">
               {!isAdmin && (
                 <button
-                  onClick={() => navigate("/topup")}
+                  onClick={() => navigate("/studio/topup")}
                   className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors"
                 >
                   <Coins className="w-4 h-4" /> {i.topUp}
                 </button>
               )}
               <button
-                onClick={() => navigate("/token-usage")}
+                onClick={() => navigate("/studio/token-usage")}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-200 transition-colors"
               >
                 <ExternalLink className="w-4 h-4" /> {i.viewUsage}
@@ -395,7 +395,7 @@ export default function ProfilePage() {
       <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
         <header className="h-14 bg-white border-b border-slate-200 px-6 flex items-center gap-4 z-30 shrink-0">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/studio")}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-4 h-4" /> {i.back}

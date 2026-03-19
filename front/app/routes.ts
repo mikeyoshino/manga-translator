@@ -1,11 +1,12 @@
 import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
 export default [
-  index("routes/home.tsx"),
-  route("editor", "routes/editor.tsx"),
+  index("routes/landing.tsx"),
+  route("studio", "routes/home.tsx"),
+  route("studio/editor", "routes/editor.tsx"),
+  route("studio/projects/:projectId", "routes/project.tsx"),
+  route("studio/topup", "routes/topup.tsx"),
+  route("studio/token-usage", "routes/token-usage.tsx"),
+  route("studio/profile", "routes/profile.tsx"),
   route("login", "routes/login.tsx"),
-  route("topup", "routes/topup.tsx"),
-  route("token-usage", "routes/token-usage.tsx"),
-  route("profile", "routes/profile.tsx"),
-  route("projects/:projectId", "routes/project.tsx"),
 ] satisfies RouteConfig;

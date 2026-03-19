@@ -274,7 +274,7 @@ function ProjectContent() {
         setProjectName(data.project.name);
         setProjectImages(data.images);
       })
-      .catch(() => navigate("/"))
+      .catch(() => navigate("/studio"))
       .finally(() => setLoadingProject(false));
   }, [session?.access_token, projectId]);
 
@@ -341,7 +341,7 @@ function ProjectContent() {
     if (untranslatedImages.length === 0) return;
     if (!isAdmin && tokenBalance < untranslatedImages.length) {
       alert(i.insufficientTokens.replace("{need}", String(untranslatedImages.length)).replace("{have}", String(tokenBalance)));
-      navigate("/topup");
+      navigate("/studio/topup");
       return;
     }
     // Set up file statuses for untranslated images
@@ -486,7 +486,7 @@ function ProjectContent() {
       };
     });
     setEditorImages(editorImages);
-    navigate("/editor");
+    navigate("/studio/editor");
   };
 
   const getStatusBadge = (pi: ProjectImage) => {
@@ -762,7 +762,7 @@ export default function ProjectPage() {
       <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
         <header className="h-14 bg-white border-b border-slate-200 px-6 flex items-center gap-4 z-30 shrink-0">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/studio")}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-4 h-4" /> {i.back}
@@ -781,7 +781,7 @@ export default function ProjectPage() {
               </div>
             ) : (
               <button
-                onClick={() => navigate("/topup")}
+                onClick={() => navigate("/studio/topup")}
                 className="flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full hover:bg-emerald-100 transition-colors"
               >
                 <Coins className="w-3.5 h-3.5 text-emerald-600" />
@@ -806,13 +806,13 @@ export default function ProjectPage() {
                     {isAdmin && <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded mt-1 inline-block">Admin</span>}
                   </div>
                   <div className="py-1">
-                    <button onClick={() => { setProfileOpen(false); navigate("/profile"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                    <button onClick={() => { setProfileOpen(false); navigate("/studio/profile"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                       <User className="w-4 h-4 text-slate-400" /> {i.profile}
                     </button>
-                    <button onClick={() => { setProfileOpen(false); navigate("/topup"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                    <button onClick={() => { setProfileOpen(false); navigate("/studio/topup"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                       <CreditCard className="w-4 h-4 text-slate-400" /> {i.subscription}
                     </button>
-                    <button onClick={() => { setProfileOpen(false); navigate("/token-usage"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                    <button onClick={() => { setProfileOpen(false); navigate("/studio/token-usage"); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                       <BarChart3 className="w-4 h-4 text-slate-400" /> {i.tokenUsage}
                       <span className="ml-auto text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
                         {isAdmin ? "\u221e" : tokenBalance}
