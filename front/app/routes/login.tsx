@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/context/AuthContext";
 
@@ -15,10 +15,13 @@ export default function LoginPage() {
   const [signUpSuccess, setSignUpSuccess] = useState(false);
 
   // Redirect if already logged in
-  if (user) {
-    navigate("/studio");
-    return null;
-  }
+  useEffect(() => {
+    if (user) {
+      navigate("/studio");
+    }
+  }, [user, navigate]);
+
+  if (user) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
