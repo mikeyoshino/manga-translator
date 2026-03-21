@@ -33,6 +33,7 @@ import {
   detectionResolutions,
   textDetectorOptions,
   inpaintingSizes,
+  inpainterOptions,
 } from "@/config";
 import { loadSettings, saveSettings } from "@/utils/localStorage";
 import { initEditableBlocks } from "@/utils/initEditableBlocks";
@@ -80,6 +81,7 @@ const t = {
     boxThreshold: "ค่าขอบ",
     unclipRatio: "อัตรา Unclip",
     maskDilation: "ขยายมาสก์",
+    inpainter: "โมเดลลบข้อความ",
     inpaintingSize: "ขนาดลบข้อความ",
     warning: "ความละเอียดสูงช่วยให้ OCR แม่นยำขึ้น แต่ใช้เวลานานขึ้น",
     resetDefault: "รีเซ็ตค่าเริ่มต้น",
@@ -99,6 +101,7 @@ const t = {
     hintResolution: "ความละเอียดที่ใช้ตรวจจับ ยิ่งสูงยิ่งแม่นแต่ช้าลง",
     hintTargetLang: "ภาษาที่ต้องการแปลเป็น",
     hintRenderDir: "ทิศทางการเรนเดอร์ข้อความแปล: อัตโนมัติ, แนวนอน หรือ แนวตั้ง",
+    hintInpainter: "โมเดลที่ใช้ลบข้อความต้นฉบับ: Lama Large (เร็ว) หรือ SDXL (คุณภาพสูง ใช้ VRAM มาก)",
     hintBoxThreshold: "ค่าขีดจำกัดความมั่นใจในการตรวจจับกล่องข้อความ ยิ่งสูงยิ่งเข้มงวด",
     hintUnclipRatio: "อัตราขยายกล่องข้อความ ค่าสูงจะได้กล่องใหญ่ขึ้น",
     hintMaskDilation: "ขยายมาสก์ลบข้อความ ค่าสูงจะลบพื้นที่รอบข้อความมากขึ้น",
@@ -132,6 +135,7 @@ const t = {
     boxThreshold: "Box Threshold",
     unclipRatio: "Unclip Ratio",
     maskDilation: "Mask Dilation",
+    inpainter: "Inpainter",
     inpaintingSize: "Inpainting Size",
     warning: "Higher resolution improves OCR accuracy but increases processing time.",
     resetDefault: "Reset to Default",
@@ -151,6 +155,7 @@ const t = {
     hintResolution: "Detection resolution — higher is more accurate but slower",
     hintTargetLang: "Language to translate into",
     hintRenderDir: "Text render direction: auto, horizontal, or vertical",
+    hintInpainter: "Model used to remove original text: Lama Large (fast) or SDXL (high quality, requires more VRAM)",
     hintBoxThreshold: "Confidence threshold for text box detection — higher is stricter",
     hintUnclipRatio: "Text box expansion ratio — higher gives larger boxes",
     hintMaskDilation: "Mask dilation around text — higher removes more surrounding area",
@@ -217,8 +222,7 @@ function ProjectContent() {
   const [customUnclipRatio, setCustomUnclipRatio] = useState<number>(savedSettings.customUnclipRatio ?? 2.3);
   const [customBoxThreshold, setCustomBoxThreshold] = useState<number>(savedSettings.customBoxThreshold ?? 0.7);
   const [maskDilationOffset, setMaskDilationOffset] = useState<number>(savedSettings.maskDilationOffset ?? 30);
-  // Inpainter hardcoded to "lama_large" — dropdown removed
-  // const [inpainter, setInpainter] = useState(savedSettings.inpainter || "default");
+  const [inpainter, setInpainter] = useState(savedSettings.inpainter || "lama_large");
   const [skipOutsideBubble, setSkipOutsideBubble] = useState(savedSettings.skipOutsideBubble ?? false);
 
   const isProcessing = useMemo(() => {
@@ -231,10 +235,10 @@ function ProjectContent() {
     const settings: TranslationSettings = {
       detectionResolution, textDetector, renderTextDirection, translator,
       targetLanguage, inpaintingSize, customUnclipRatio, customBoxThreshold,
-      maskDilationOffset, skipOutsideBubble,
+      maskDilationOffset, inpainter, skipOutsideBubble,
     };
     saveSettings(settings);
-  }, [detectionResolution, textDetector, renderTextDirection, targetLanguage, inpaintingSize, customUnclipRatio, customBoxThreshold, maskDilationOffset, skipOutsideBubble]);
+  }, [detectionResolution, textDetector, renderTextDirection, targetLanguage, inpaintingSize, customUnclipRatio, customBoxThreshold, maskDilationOffset, inpainter, skipOutsideBubble]);
 
   // Clipboard paste
   useEffect(() => {
@@ -346,7 +350,7 @@ function ProjectContent() {
     detector: { detector: textDetector, detection_size: detectionResolution, box_threshold: customBoxThreshold, unclip_ratio: customUnclipRatio },
     render: { direction: renderTextDirection },
     translator: { translator, target_lang: targetLanguage },
-    inpainter: { inpainter: "lama_large", inpainting_size: inpaintingSize },
+    inpainter: { inpainter, inpainting_size: inpaintingSize },
     ocr: { ignore_bubble: skipOutsideBubble ? 10 : 0 },
     mask_dilation_offset: maskDilationOffset,
   });
@@ -650,10 +654,8 @@ function ProjectContent() {
               <SliderInput label={i.boxThreshold} value={customBoxThreshold} min={0} max={1} step={0.01} onChange={setCustomBoxThreshold} hint={i.hintBoxThreshold} />
               <SliderInput label={i.unclipRatio} value={customUnclipRatio} min={0} max={5} step={0.01} onChange={setCustomUnclipRatio} hint={i.hintUnclipRatio} />
               <SliderInput label={i.maskDilation} value={maskDilationOffset} min={0} max={100} step={1} onChange={setMaskDilationOffset} hint={i.hintMaskDilation} />
-              {/* Inpainter dropdown — hardcoded to lama_large, uncomment to restore
               <SidebarSelect label={i.inpainter} value={inpainter} onChange={setInpainter}
                 options={inpainterOptions.map((o) => ({ value: o.value, label: o.label }))} hint={i.hintInpainter} />
-              */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-600">{i.inpaintingSize}<InfoTooltip text={i.hintInpaintingSize} /></label>
                 <select className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900"
@@ -677,7 +679,7 @@ function ProjectContent() {
                 onClick={() => {
                   setDetectionResolution("1536"); setTextDetector("default"); setRenderTextDirection("auto");
                   setTargetLanguage("THA"); setInpaintingSize("2048"); setCustomUnclipRatio(2.3);
-                  setCustomBoxThreshold(0.7); setMaskDilationOffset(30); setSkipOutsideBubble(false);
+                  setCustomBoxThreshold(0.7); setMaskDilationOffset(30); setInpainter("lama_large"); setSkipOutsideBubble(false);
                 }}
                 className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
               >

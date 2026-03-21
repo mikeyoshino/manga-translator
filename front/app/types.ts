@@ -114,7 +114,7 @@ export interface TranslationSettings {
   customUnclipRatio: number;
   customBoxThreshold: number;
   maskDilationOffset: number;
-  // inpainter: string; // hardcoded to "lama_large"
+  inpainter: string;
   skipOutsideBubble: boolean;
 }
 

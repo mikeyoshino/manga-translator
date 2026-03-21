@@ -94,6 +94,7 @@ class Inpainter(str, Enum):
     lama_large = "lama_large"
     lama_mpe = "lama_mpe"
     sd = "sd"
+    sdxl = "sdxl"
     none = "none"
     original = "original"
 

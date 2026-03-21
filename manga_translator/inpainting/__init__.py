@@ -6,6 +6,7 @@ from .common import CommonInpainter, OfflineInpainter
 from .inpainting_aot import AotInpainter
 from .inpainting_lama_mpe import LamaMPEInpainter, LamaLargeInpainter
 from .inpainting_sd import StableDiffusionInpainter
+from .inpainting_sdxl import StableDiffusionXLInpainter
 from .none import NoneInpainter
 from .original import OriginalInpainter
 from ..config import Inpainter, InpainterConfig
@@ -15,6 +16,7 @@ INPAINTERS = {
     Inpainter.lama_large: LamaLargeInpainter,
     Inpainter.lama_mpe: LamaMPEInpainter,
     Inpainter.sd: StableDiffusionInpainter,
+    Inpainter.sdxl: StableDiffusionXLInpainter,
     Inpainter.none: NoneInpainter,
     Inpainter.original: OriginalInpainter,
 }
