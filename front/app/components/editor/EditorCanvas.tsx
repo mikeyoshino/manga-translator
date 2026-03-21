@@ -472,8 +472,10 @@ export function EditorCanvas() {
                   editedY: Math.round(y),
                 })
               }
-              onTransformEnd={(width, height) =>
+              onTransformEnd={(x, y, width, height) =>
                 updateBlock(currentImage.id, block.id, {
+                  editedX: Math.round(x),
+                  editedY: Math.round(y),
                   editedWidth: Math.round(width),
                   editedHeight: Math.round(height),
                 })
