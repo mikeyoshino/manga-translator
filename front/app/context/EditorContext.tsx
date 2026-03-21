@@ -505,7 +505,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
           target_lang: savedSettings.targetLanguage || "THA",
         },
         inpainter: {
-          inpainter: savedSettings.inpainter || "default",
+          inpainter: "lama_large",
           inpainting_size: savedSettings.inpaintingSize || "2048",
         },
         ocr: { ignore_bubble: savedSettings.skipOutsideBubble ? 10 : 0 },
