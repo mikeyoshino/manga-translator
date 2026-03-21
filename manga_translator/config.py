@@ -298,6 +298,16 @@ class InpainterConfig(BaseModel):
     """Size of image used for inpainting (too large will result in OOM)"""
     inpainting_precision: InpaintPrecision = InpaintPrecision.bf16
     """Inpainting precision for lama, use bf16 while you can."""
+    sdxl_strength: float = 0.75
+    """SDXL denoising strength. Lower values preserve more original context (default 0.75)."""
+    sdxl_guidance_scale: float = 3.0
+    """SDXL classifier-free guidance scale. Lower values produce more neutral fills (default 3.0)."""
+    sdxl_num_inference_steps: int = 20
+    """SDXL number of inference steps (default 20)."""
+    sdxl_auto_white_fill: bool = True
+    """Auto-fill predominantly white/light masked regions (speech bubbles) without calling SDXL."""
+    sdxl_white_threshold: int = 240
+    """Brightness threshold (0-255) for auto white-fill detection (default 240)."""
 
 class ColorizerConfig(BaseModel):
     colorization_size: int = 576
