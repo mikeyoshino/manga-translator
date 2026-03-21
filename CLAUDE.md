@@ -75,6 +75,7 @@ The core ~138KB file orchestrating the full pipeline. Each stage has swappable i
 - `args.py` — CLI argument parsing with subcommands: `local`, `ws`, `shared`, `config-help`
 - `utils/textblock.py` — Core `TextBlock` data structure for text regions
 - `utils/generic.py` — Shared helpers and image processing utilities
+- `server/token_guard.py` — `TokenCharge` class with idempotent refund and `deduct_or_raise()` helper for all paid endpoints
 
 ### Translator Chains
 Translators can be chained: `--translator "chatgpt:JPN;sugoi:ENG"` runs ChatGPT first (→JPN), then Sugoi (→ENG). Parsed by `TranslatorChain` in `config.py`.
@@ -148,3 +149,21 @@ JSON keys are namespaced: `landing`, `login`, `navbar`, `home`, `project`, `topu
 - **Server code**: Use the JSON formatter from `server/log_config.py`. Set `correlation_id` in request-handling paths.
 - **Error tracking**: Sentry Cloud captures errors from API, Worker, and Client. DSN configured via `SENTRY_DSN` (backend) / `VITE_SENTRY_DSN` (frontend) env vars.
 - **When adding try/except**: Always call `sentry_sdk.capture_exception(e)` and `logger.error(...)` with context before re-raising or handling.
+
+## Token Billing & Refund
+
+All paid endpoints (`/translate/with-form/*`, `/inpaint`, `/projects/.../translate`) deduct tokens before work starts and refund on failure.
+
+### How it works (`server/token_guard.py`)
+- `deduct_or_raise(user_id, amount, reference, is_admin)` — deducts tokens or raises HTTP 402. Returns `None` for admins.
+- `TokenCharge.refund(reason)` — idempotent (safe to call multiple times). Credits tokens back with `type_="refund"`. On refund failure, logs ERROR and sends a Sentry fatal message for ops alerting.
+
+### Endpoint patterns
+- **Non-streaming** (json, bytes, image): wrap `get_ctx()` in try/except, call `charge.refund()` on failure.
+- **Streaming** (all `/stream` endpoints, project translate): pass `charge.refund` as `on_error` callback to `while_streaming()`.
+- **Inpaint**: refund in existing except block.
+
+### Adding a new paid endpoint
+1. Call `charge = deduct_or_raise(user.id, TOKEN_COST_PER_IMAGE, "your/ref", user.is_admin)`
+2. For non-streaming: wrap work in try/except, call `charge.refund(reason=str(e))` in except
+3. For streaming: pass `on_error=charge.refund if charge else None` to `while_streaming()`
