@@ -7,7 +7,6 @@ import {
   detectionResolutions,
   textDetectorOptions,
   inpaintingSizes,
-  inpainterOptions,
 } from "@/config";
 import { LabeledInput } from "@/components/LabeledInput";
 import { LabeledSelect } from "@/components/LabeledSelect";
@@ -22,7 +21,6 @@ type Props = {
   customUnclipRatio: number;
   customBoxThreshold: number;
   maskDilationOffset: number;
-  inpainter: string;
 
   setDetectionResolution: (val: string) => void;
   setTextDetector: (val: string) => void;
@@ -33,7 +31,6 @@ type Props = {
   setCustomUnclipRatio: (val: number) => void;
   setCustomBoxThreshold: (val: number) => void;
   setMaskDilationOffset: (val: number) => void;
-  setInpainter: (val: string) => void;
 };
 
 export const OptionsPanel: React.FC<Props> = ({
@@ -46,7 +43,6 @@ export const OptionsPanel: React.FC<Props> = ({
   customUnclipRatio,
   customBoxThreshold,
   maskDilationOffset,
-  inpainter,
   setDetectionResolution,
   setTextDetector,
   setRenderTextDirection,
@@ -56,7 +52,6 @@ export const OptionsPanel: React.FC<Props> = ({
   setCustomUnclipRatio,
   setCustomBoxThreshold,
   setMaskDilationOffset,
-  setInpainter,
 }) => {
   return (
     <>
@@ -177,16 +172,6 @@ export const OptionsPanel: React.FC<Props> = ({
           onChange={setMaskDilationOffset}
         />
 
-        {/* Inpainter */}
-        <LabeledSelect
-          id="inpainter"
-          label="Inpainter"
-          icon="carbon:paint-brush"
-          title="Inpainter"
-          value={inpainter}
-          onChange={setInpainter}
-          options={inpainterOptions}
-        />
       </div>
     </>
   );

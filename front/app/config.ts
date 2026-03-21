@@ -37,14 +37,15 @@ export const textDetectorOptions = [
   { value: "paddle", label: "Paddle" },
 ];
 
-export const inpainterOptions = [
-  { value: "default", label: "Default" },
-  { value: "lama_large", label: "Lama Large" },
-  { value: "lama_mpe", label: "Lama MPE" },
-  { value: "sd", label: "SD" },
-  { value: "none", label: "None" },
-  { value: "original", label: "Original" },
-];
+// Inpainter options — hardcoded to "lama_large" for now
+// export const inpainterOptions = [
+//   { value: "default", label: "Default" },
+//   { value: "lama_large", label: "Lama Large" },
+//   { value: "lama_mpe", label: "Lama MPE" },
+//   { value: "sd", label: "SD" },
+//   { value: "none", label: "None" },
+//   { value: "original", label: "Original" },
+// ];
 
 export const imageMimeTypes = [
   "image/png",
