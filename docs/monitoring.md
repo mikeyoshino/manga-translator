@@ -141,6 +141,36 @@ No Sentry SDK network calls are made when the DSN is empty.
 
 ---
 
+## Token Refund on Translation Failure
+
+All paid endpoints deduct tokens before translation starts. If translation fails, tokens are automatically refunded via `server/token_guard.py`.
+
+### What gets logged
+
+| Event | Level | Sentry |
+|-------|-------|--------|
+| Successful refund | WARNING | — |
+| Refund failure (e.g. Supabase down) | ERROR | `capture_exception` + `capture_message` at **fatal** level |
+
+Refund failures produce a fatal-level Sentry message containing the user ID, amount, and reference — configure a Sentry alert rule on `level:fatal` to page on-call.
+
+### How refunds work
+
+1. `deduct_or_raise()` deducts tokens and returns a `TokenCharge` object (or `None` for admins)
+2. On error: non-streaming endpoints call `charge.refund(reason)` in their except block; streaming endpoints pass `charge.refund` as an `on_error` callback to `while_streaming()`
+3. `TokenCharge.refund()` is idempotent — a `_refunded` flag prevents double credits
+4. Refund calls `sb.credit_tokens(..., type_="refund")` which inserts a transaction record
+
+### Affected endpoints
+
+All 10 token-charging endpoints in `server/main.py`:
+- `/translate/with-form/json`, `/bytes`, `/image` (non-streaming)
+- `/translate/with-form/json/stream`, `/bytes/stream`, `/image/stream`, `/image/stream/web` (streaming)
+- `/inpaint`
+- `/projects/{id}/images/{id}/translate` (streaming)
+
+---
+
 ## Files
 
 | File | Role |
@@ -149,4 +179,5 @@ No Sentry SDK network calls are made when the DSN is empty.
 | `server/log_config.py` | `setup_logging(level)` — JSON formatter + `correlation_id` context var |
 | `server/main.py` | Calls `setup_logging()` + `init_sentry("api")` at import time |
 | `server/worker.py` | Calls `setup_logging()` + `init_sentry("worker")` in `main()` |
-| `server/request_extraction.py` | Sets `task_id` Sentry tag when enqueuing jobs |
+| `server/request_extraction.py` | Sets `task_id` Sentry tag when enqueuing jobs; supports `on_error` callback for streaming refunds |
+| `server/token_guard.py` | `TokenCharge` class with idempotent refund + `deduct_or_raise()` helper |
