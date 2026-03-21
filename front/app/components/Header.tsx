@@ -33,7 +33,7 @@ export const Header: React.FC<Props> = () => {
                 href="/studio"
                 className="inline-flex items-center px-1 pt-1 font-medium text-gray-900"
               >
-                Manga Translator
+                WunPlae
               </a>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { useEditor } from "@/context/EditorContext";
 import { availableFonts } from "@/utils/fontMap";
-import { getEditorLocale, editorT } from "@/utils/editorI18n";
+import { useT } from "@/context/LocaleContext";
 
 function InfoTooltip({ text }: { text: string }) {
   return (
@@ -33,8 +33,7 @@ function DrawingToolsPanel() {
     activeTool, penColor, setPenColor, penSize, setPenSize,
     currentImage, drawingLines, undoDrawingLine, clearDrawingLines,
   } = useEditor();
-  const locale = getEditorLocale();
-  const i = editorT[locale];
+  const i = useT().editor;
 
   const currentLines = currentImage ? (drawingLines.get(currentImage.id) || []) : [];
 
@@ -159,8 +158,7 @@ function DrawingToolsPanel() {
 
 function BlockPropertiesPanel() {
   const { currentImage, selectedBlockId, updateBlock } = useEditor();
-  const locale = getEditorLocale();
-  const i = editorT[locale];
+  const i = useT().editor;
 
   if (!currentImage || !selectedBlockId) {
     return (
@@ -416,8 +414,7 @@ function MagicRemoverPanel() {
     undoMagicRemoverLine, clearMagicRemoverLines,
     isInpainting, applyMagicRemover, undoMagicRemover, imageHistory,
   } = useEditor();
-  const locale = getEditorLocale();
-  const i = editorT[locale];
+  const i = useT().editor;
 
   const currentLines = currentImage ? (magicRemoverLines.get(currentImage.id) || []) : [];
   const historyStack = currentImage ? (imageHistory.get(currentImage.id) || []) : [];
@@ -496,8 +493,7 @@ function ManualTranslatePanel() {
     currentImage, manualTranslateRect, clearManualTranslateRect,
     isManualTranslating, applyManualTranslate, manualTranslateError,
   } = useEditor();
-  const locale = getEditorLocale();
-  const i = editorT[locale];
+  const i = useT().editor;
 
   const rect = currentImage ? manualTranslateRect.get(currentImage.id) ?? null : null;
 
@@ -563,8 +559,7 @@ function CloneStampPanel() {
     undoCloneStampStroke, clearCloneStampStrokes,
     isCloneStamping, applyCloneStamp,
   } = useEditor();
-  const locale = getEditorLocale();
-  const i = editorT[locale];
+  const i = useT().editor;
 
   const source = currentImage ? (cloneStampSource.get(currentImage.id) ?? null) : null;
   const strokes = currentImage ? (cloneStampStrokes.get(currentImage.id) || []) : [];
@@ -578,7 +573,7 @@ function CloneStampPanel() {
       <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2 mb-3">
         {source
           ? `X: ${Math.round(source.x)}, Y: ${Math.round(source.y)}`
-          : (locale === "th" ? "ยังไม่ได้ตั้ง" : "Not set")}
+          : i.notSet}
       </div>
 
       {/* Brush size */}

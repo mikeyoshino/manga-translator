@@ -1,16 +1,18 @@
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router";
 import { useEffect } from "react";
+import { useLocalePath } from "@/context/LocaleContext";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const lp = useLocalePath();
 
   useEffect(() => {
     if (!loading && !user) {
-      navigate("/login");
+      navigate(lp("/login"));
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, lp]);
 
   if (loading) {
     return (

@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
+import { useLocale, useLocalePath, useT } from "@/context/LocaleContext";
+import type { Locale } from "@/context/LocaleContext";
 import { Navbar } from "@/components/Navbar";
 import {
   Settings2,
@@ -55,117 +57,6 @@ export function HydrateFallback() {
   );
 }
 
-type Locale = "th" | "en";
-const t = {
-  th: {
-    back: "กลับ",
-    workspace: "พื้นที่ทำงาน",
-    clear: "ล้าง",
-    editor: "ตัวแก้ไข",
-    runTranslation: "เริ่มแปล",
-    dropTitle: "วางหน้ามังงะที่นี่",
-    dropDesc: "รองรับอัปโหลดหลายไฟล์และ Ctrl+V วาง",
-    dropHint: "การอัพรูปหลายๆ รูปพร้อมกัน ช่วยให้ AI เข้าใจบริบทของเนื้อหาได้ดีขึ้นและแปลได้แม่นยำยิ่งขึ้น",
-    queue: "คิว",
-    ready: "พร้อม",
-    uploaded: "อัปโหลดแล้ว",
-    translating: "กำลังแปล",
-    translated: "แปลแล้ว",
-    error: "ผิดพลาด",
-    config: "การตั้งค่า",
-    detection: "การตรวจจับ",
-    textDetector: "ตัวตรวจจับข้อความ",
-    resolution: "ความละเอียด",
-    translation: "การแปล",
-    targetLang: "ภาษาเป้าหมาย",
-    renderDir: "ทิศทางข้อความ",
-    visuals: "ภาพ",
-    boxThreshold: "ค่าขอบ",
-    unclipRatio: "อัตรา Unclip",
-    maskDilation: "ขยายมาสก์",
-    inpainter: "โมเดลลบข้อความ",
-    inpaintingSize: "ขนาดลบข้อความ",
-    warning: "ความละเอียดสูงช่วยให้ OCR แม่นยำขึ้น แต่ใช้เวลานานขึ้น",
-    resetDefault: "รีเซ็ตค่าเริ่มต้น",
-    insufficientTokens: "โทเค็นไม่เพียงพอ ต้องใช้ {need} โทเค็น แต่มี {have} กรุณาเติมเงิน",
-    auto: "อัตโนมัติ",
-    horizontal: "แนวนอน",
-    vertical: "แนวตั้ง",
-    uploading: "กำลังอัปโหลด...",
-    images: "รูป",
-    tokens: "โทเค็น",
-    adminUnlimited: "ผู้ดูแล (ไม่จำกัด)",
-    profile: "โปรไฟล์",
-    subscription: "แพ็กเกจสมาชิก",
-    tokenUsage: "การใช้โทเค็น",
-    signOut: "ออกจากระบบ",
-    hintTextDetector: "โมเดลที่ใช้ตรวจจับตำแหน่งข้อความในภาพ",
-    hintResolution: "ความละเอียดที่ใช้ตรวจจับ ยิ่งสูงยิ่งแม่นแต่ช้าลง",
-    hintTargetLang: "ภาษาที่ต้องการแปลเป็น",
-    hintRenderDir: "ทิศทางการเรนเดอร์ข้อความแปล: อัตโนมัติ, แนวนอน หรือ แนวตั้ง",
-    hintInpainter: "โมเดลที่ใช้ลบข้อความต้นฉบับ: Lama Large (เร็ว) หรือ SDXL (คุณภาพสูง ใช้ VRAM มาก)",
-    hintBoxThreshold: "ค่าขีดจำกัดความมั่นใจในการตรวจจับกล่องข้อความ ยิ่งสูงยิ่งเข้มงวด",
-    hintUnclipRatio: "อัตราขยายกล่องข้อความ ค่าสูงจะได้กล่องใหญ่ขึ้น",
-    hintMaskDilation: "ขยายมาสก์ลบข้อความ ค่าสูงจะลบพื้นที่รอบข้อความมากขึ้น",
-    hintInpaintingSize: "ความละเอียดที่ใช้ในการลบข้อความ",
-    skipOutsideBubble: "ข้ามข้อความนอกบับเบิ้ล",
-    hintSkipOutsideBubble: "ข้ามการลบและแปลข้อความที่อยู่นอกกรอบคำพูด เช่น เสียงเอฟเฟกต์ที่ซ้อนบนภาพ",
-  },
-  en: {
-    back: "Back",
-    workspace: "Workspace",
-    clear: "Clear",
-    editor: "Editor",
-    runTranslation: "Run Translation",
-    dropTitle: "Drop your manga pages here",
-    dropDesc: "Supports batch upload and Ctrl+V clipboard paste",
-    dropHint: "Uploading multiple images together helps AI understand context better and translate more accurately",
-    queue: "Queue",
-    ready: "ready",
-    uploaded: "Uploaded",
-    translating: "Translating",
-    translated: "Translated",
-    error: "Error",
-    config: "Configuration",
-    detection: "Detection",
-    textDetector: "Text Detector",
-    resolution: "Resolution",
-    translation: "Translation",
-    targetLang: "Target Language",
-    renderDir: "Render Direction",
-    visuals: "Visuals",
-    boxThreshold: "Box Threshold",
-    unclipRatio: "Unclip Ratio",
-    maskDilation: "Mask Dilation",
-    inpainter: "Inpainter",
-    inpaintingSize: "Inpainting Size",
-    warning: "Higher resolution improves OCR accuracy but increases processing time.",
-    resetDefault: "Reset to Default",
-    insufficientTokens: "Insufficient tokens. You need {need} token(s) but have {have}. Please top up.",
-    auto: "Auto",
-    horizontal: "Horizontal",
-    vertical: "Vertical",
-    uploading: "Uploading...",
-    images: "images",
-    tokens: "Tokens",
-    adminUnlimited: "Admin (Unlimited)",
-    profile: "Profile",
-    subscription: "Subscription",
-    tokenUsage: "Token Usage",
-    signOut: "Sign out",
-    hintTextDetector: "Model used to detect text regions in the image",
-    hintResolution: "Detection resolution — higher is more accurate but slower",
-    hintTargetLang: "Language to translate into",
-    hintRenderDir: "Text render direction: auto, horizontal, or vertical",
-    hintInpainter: "Model used to remove original text: Lama Large (fast) or SDXL (high quality, requires more VRAM)",
-    hintBoxThreshold: "Confidence threshold for text box detection — higher is stricter",
-    hintUnclipRatio: "Text box expansion ratio — higher gives larger boxes",
-    hintMaskDilation: "Mask dilation around text — higher removes more surrounding area",
-    hintInpaintingSize: "Resolution used for text removal inpainting",
-    skipOutsideBubble: "Skip Outside-Bubble Text",
-    hintSkipOutsideBubble: "Skip removing and translating text outside speech bubbles (e.g. sound effects on artwork)",
-  },
-} as const;
 
 function InfoTooltip({ text }: { text: string }) {
   return (
@@ -199,8 +90,9 @@ function ProjectContent() {
   const { setImages: setEditorImages } = useEditor();
   const { user, tokenBalance, isAdmin, refreshBalance } = useAuth();
 
-  const [locale] = useState<Locale>(() => (localStorage.getItem("manga-translator-locale") as Locale) || "th");
-  const i = t[locale];
+  const locale = useLocale();
+  const lp = useLocalePath();
+  const i = useT().project;
 
   // Project data
   const [projectName, setProjectName] = useState("");
@@ -273,7 +165,7 @@ function ProjectContent() {
         setProjectName(data.project.name);
         setProjectImages(data.images);
       })
-      .catch(() => navigate("/studio"))
+      .catch(() => navigate(lp("/studio")))
       .finally(() => setLoadingProject(false));
   }, [user, projectId]);
 
@@ -338,7 +230,7 @@ function ProjectContent() {
     if (untranslatedImages.length === 0) return;
     if (!isAdmin && tokenBalance < untranslatedImages.length) {
       alert(i.insufficientTokens.replace("{need}", String(untranslatedImages.length)).replace("{have}", String(tokenBalance)));
-      navigate("/studio/topup");
+      navigate(lp("/studio/topup"));
       return;
     }
     // Set up file statuses for untranslated images
@@ -476,7 +368,7 @@ function ProjectContent() {
       };
     });
     setEditorImages(editorImages);
-    navigate("/studio/editor");
+    navigate(lp("/studio/editor"));
   };
 
   const getStatusBadge = (pi: ProjectImage) => {

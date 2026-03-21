@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { exportSingleImage, exportAllAsZip } from "@/utils/exportZip";
 import { useCallback } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Download, FolderArchive, Pencil, Eraser, Undo2, Redo2, Sparkles, ScanSearch, Stamp } from "lucide-react";
-import { getEditorLocale, editorT } from "@/utils/editorI18n";
+import { useT, useLocalePath } from "@/context/LocaleContext";
 
 export function EditorToolbar() {
   const {
@@ -15,10 +15,10 @@ export function EditorToolbar() {
     undo, redo, canUndo, canRedo,
   } = useEditor();
   const navigate = useNavigate();
-  const locale = getEditorLocale();
-  const i = editorT[locale];
+  const lp = useLocalePath();
+  const i = useT().editor;
 
-  const handleBack = () => navigate("/studio");
+  const handleBack = () => navigate(lp("/studio"));
 
   const handlePrev = () => {
     setSelectedBlockId(null);
