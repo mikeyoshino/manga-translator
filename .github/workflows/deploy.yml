@@ -6,10 +6,12 @@ on:
     paths:
       - 'server/**'
       - 'front/**'
+      - 'crm/**'
       - 'manga_translator/**'
       - 'docker-compose.yml'
       - 'docker-compose.prod.yml'
       - 'Dockerfile.api'
+      - 'Dockerfile.nginx'
       - 'Dockerfile.runpod'
       - 'nginx.conf'
       - 'requirements-api.txt'
@@ -37,6 +39,7 @@ env:
   REGISTRY: ghcr.io
   API_IMAGE: ghcr.io/${{ github.repository }}/api
   FRONT_IMAGE: ghcr.io/${{ github.repository }}/front
+  NGINX_IMAGE: ghcr.io/${{ github.repository }}/nginx
   RUNPOD_IMAGE: ghcr.io/${{ github.repository }}/runpod-worker
 
 jobs:
@@ -46,6 +49,7 @@ jobs:
     outputs:
       api: ${{ steps.changes.outputs.api }}
       front: ${{ steps.changes.outputs.front }}
+      nginx: ${{ steps.changes.outputs.nginx }}
       worker: ${{ steps.changes.outputs.worker }}
     steps:
       - uses: actions/checkout@v4
@@ -60,10 +64,12 @@ jobs:
             if [ "$DEPLOY_ALL" = "true" ]; then
               echo "api=true" >> $GITHUB_OUTPUT
               echo "front=true" >> $GITHUB_OUTPUT
+              echo "nginx=true" >> $GITHUB_OUTPUT
               echo "worker=true" >> $GITHUB_OUTPUT
             else
               echo "api=${{ github.event.inputs.deploy_api }}" >> $GITHUB_OUTPUT
               echo "front=${{ github.event.inputs.deploy_front }}" >> $GITHUB_OUTPUT
+              echo "nginx=${{ github.event.inputs.deploy_api || github.event.inputs.deploy_front }}" >> $GITHUB_OUTPUT
               echo "worker=${{ github.event.inputs.deploy_worker }}" >> $GITHUB_OUTPUT
             fi
             exit 0
@@ -76,6 +82,7 @@ jobs:
 
           API=false
           FRONT=false
+          NGINX=false
           WORKER=false
 
           # API: server/**, Dockerfile.api, requirements-api.txt, manga_translator/**
@@ -88,26 +95,33 @@ jobs:
             FRONT=true
           fi
 
+          # Nginx + CRM: crm/**, nginx.conf, Dockerfile.nginx
+          if echo "$CHANGED" | grep -qE '^(crm/|nginx\.conf|Dockerfile\.nginx)'; then
+            NGINX=true
+          fi
+
           # Worker: Dockerfile.runpod, requirements.txt, manga_translator/**, server/runpod_handler.py, server/smart_routing.py
           if echo "$CHANGED" | grep -qE '^(Dockerfile\.runpod|requirements\.txt|manga_translator/|server/runpod_handler\.py|server/smart_routing\.py)'; then
             WORKER=true
           fi
 
           # Shared files that affect everything
-          if echo "$CHANGED" | grep -qE '^(docker-compose\.yml|docker-compose\.prod\.yml|nginx\.conf)'; then
+          if echo "$CHANGED" | grep -qE '^(docker-compose\.yml|docker-compose\.prod\.yml)'; then
             API=true
             FRONT=true
+            NGINX=true
             WORKER=true
           fi
 
           echo "api=$API" >> $GITHUB_OUTPUT
           echo "front=$FRONT" >> $GITHUB_OUTPUT
+          echo "nginx=$NGINX" >> $GITHUB_OUTPUT
           echo "worker=$WORKER" >> $GITHUB_OUTPUT
 
   build-and-push:
     name: Build & Push Images
     needs: detect-changes
-    if: needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.front == 'true' || needs.detect-changes.outputs.worker == 'true'
+    if: needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.front == 'true' || needs.detect-changes.outputs.nginx == 'true' || needs.detect-changes.outputs.worker == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -148,6 +162,20 @@ jobs:
             VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
             VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
             VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Nginx + CRM image
+        if: needs.detect-changes.outputs.nginx == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.nginx
+          push: true
+          tags: ${{ env.NGINX_IMAGE }}:latest,${{ env.NGINX_IMAGE }}:${{ github.sha }}
+          build-args: |
+            VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
+            VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -213,7 +241,7 @@ jobs:
   deploy:
     name: Deploy to Contabo VPS
     needs: [detect-changes, build-and-push]
-    if: always() && (needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.front == 'true') && needs.build-and-push.result == 'success'
+    if: always() && (needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.front == 'true' || needs.detect-changes.outputs.nginx == 'true') && needs.build-and-push.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -242,6 +270,9 @@ jobs:
             fi
             if [ "${{ needs.detect-changes.outputs.front }}" = "true" ]; then
               PULL_SERVICES="$PULL_SERVICES front"
+            fi
+            if [ "${{ needs.detect-changes.outputs.nginx }}" = "true" ]; then
+              PULL_SERVICES="$PULL_SERVICES nginx"
             fi
 
             if [ -n "$PULL_SERVICES" ]; then
