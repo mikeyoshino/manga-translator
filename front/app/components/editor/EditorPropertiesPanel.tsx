@@ -350,29 +350,6 @@ function BlockPropertiesPanel() {
         className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-lg p-1.5 mb-3 focus:ring-2 focus:ring-indigo-500/20 outline-none"
       />
 
-      {/* Position */}
-      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.position} <InfoTooltip text={i.hintPosition} /></label>
-      <div className="flex gap-2 mb-3">
-        <div className="flex-1">
-          <span className="text-[10px] text-slate-400">X</span>
-          <input
-            type="number"
-            value={block.editedX}
-            onChange={(e) => update({ editedX: Number(e.target.value) })}
-            className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-          />
-        </div>
-        <div className="flex-1">
-          <span className="text-[10px] text-slate-400">Y</span>
-          <input
-            type="number"
-            value={block.editedY}
-            onChange={(e) => update({ editedY: Number(e.target.value) })}
-            className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-          />
-        </div>
-      </div>
-
       {/* Size */}
       <label className="block text-xs font-semibold text-slate-500 mb-1">{i.size} <InfoTooltip text={i.hintSize} /></label>
       <div className="flex gap-2 mb-3">
@@ -678,31 +655,15 @@ function CloneStampPanel() {
         )}
       </button>
 
-      {/* Bilingual guide */}
+      {/* Guide */}
       <div className="mt-4 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
         <p className="text-xs font-bold text-indigo-800 mb-2">{i.guideTitle}</p>
-        <ol className="space-y-2 text-xs">
-          <li>
-            <span className="text-slate-700">1. {i.guideStep1_th}</span>
-            <br />
-            <span className="text-slate-400">&nbsp;&nbsp;&nbsp;{i.guideStep1_en}</span>
-          </li>
-          <li>
-            <span className="text-slate-700">2. {i.guideStep2_th}</span>
-            <br />
-            <span className="text-slate-400">&nbsp;&nbsp;&nbsp;{i.guideStep2_en}</span>
-          </li>
-          <li>
-            <span className="text-slate-700">3. {i.guideStep3_th}</span>
-            <br />
-            <span className="text-slate-400">&nbsp;&nbsp;&nbsp;{i.guideStep3_en}</span>
-          </li>
+        <ol className="space-y-1.5 text-xs text-slate-700">
+          <li>1. {i.guideStep1}</li>
+          <li>2. {i.guideStep2}</li>
+          <li>3. {i.guideStep3}</li>
         </ol>
-        <p className="mt-2 text-[11px] text-indigo-700">
-          <span>💡 {i.guideTip_th}</span>
-          <br />
-          <span className="text-slate-400">&nbsp;&nbsp;&nbsp;{i.guideTip_en}</span>
-        </p>
+        <p className="mt-2 text-[11px] text-indigo-700">💡 {i.guideTip}</p>
       </div>
     </div>
   );

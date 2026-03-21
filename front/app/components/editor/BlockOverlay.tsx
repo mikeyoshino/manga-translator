@@ -13,7 +13,7 @@ interface BlockOverlayProps {
   onSelect: () => void;
   onDblClick: () => void;
   onDragEnd: (x: number, y: number) => void;
-  onTransformEnd: (width: number, height: number) => void;
+  onTransformEnd: (x: number, y: number, width: number, height: number) => void;
 }
 
 export function BlockOverlay({
@@ -159,6 +159,8 @@ export function BlockOverlay({
     node.scaleX(1);
     node.scaleY(1);
     onTransformEnd(
+      node.x(),
+      node.y(),
       Math.max(20, node.width() * scaleX),
       Math.max(20, node.height() * scaleY)
     );

@@ -79,7 +79,7 @@ export const OptionsPanel: React.FC<Props> = ({
           title="Text detector"
           value={textDetector}
           onChange={setTextDetector}
-          options={textDetectorOptions}
+          options={textDetectorOptions.map((o) => ({ value: o.value, label: o.label.en }))}
         />
 
         {/* Render text direction */}

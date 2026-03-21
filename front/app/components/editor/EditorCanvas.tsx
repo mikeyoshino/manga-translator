@@ -16,6 +16,9 @@ interface InlineEdit {
   fontFamily: string;
   color: string;
   align: string;
+  lineSpacing: number;
+  bold: boolean;
+  italic: boolean;
 }
 
 export function EditorCanvas() {
@@ -407,6 +410,9 @@ export function EditorCanvas() {
         fontFamily: block.editedFontFamily,
         color: block.editedColor,
         align: block.editedAlignment,
+        lineSpacing: block.editedLineSpacing,
+        bold: block.editedBold,
+        italic: block.editedItalic,
       });
     },
     [currentImage, scale, position]
@@ -447,40 +453,12 @@ export function EditorCanvas() {
         onTouchEnd={handleMouseUp}
         className="konva-stage"
       >
+        {/* Background + drawing layer (pen strokes behind text) */}
         <Layer>
           {bgImage && <KonvaImage image={bgImage} />}
-          {currentImage.editableBlocks.map((block) => (
-            <BlockOverlay
-              key={block.id}
-              block={block}
-              interactive={!isDrawingTool && !isRectTool && !isCloneStampTool}
-              isSelected={block.id === selectedBlockId}
-              isEditing={inlineEdit?.blockId === block.id}
-              onSelect={() => {
-                if (!isDrawingTool) setSelectedBlockId(block.id);
-              }}
-              onDblClick={() => !isDrawingTool && handleBlockDblClick(block.id)}
-              onDragEnd={(x, y) =>
-                updateBlock(currentImage.id, block.id, {
-                  editedX: Math.round(x),
-                  editedY: Math.round(y),
-                })
-              }
-              onTransformEnd={(width, height) =>
-                updateBlock(currentImage.id, block.id, {
-                  editedWidth: Math.round(width),
-                  editedHeight: Math.round(height),
-                })
-              }
-            />
-          ))}
-        </Layer>
-
-        {/* Drawing layer — on top of blocks */}
-        <Layer>
           {existingLines.map((line, idx) => (
             <Line
-              key={idx}
+              key={`draw-${idx}`}
               points={line.points}
               stroke={line.tool === "eraser" ? "#000000" : line.color}
               strokeWidth={line.size}
@@ -506,6 +484,38 @@ export function EditorCanvas() {
             />
           )}
         </Layer>
+
+        {/* Text blocks layer — on top of pen strokes */}
+        <Layer>
+          {currentImage.editableBlocks.map((block) => (
+            <BlockOverlay
+              key={block.id}
+              block={block}
+              interactive={!isDrawingTool && !isRectTool && !isCloneStampTool}
+              isSelected={block.id === selectedBlockId}
+              isEditing={inlineEdit?.blockId === block.id}
+              onSelect={() => {
+                if (!isDrawingTool) setSelectedBlockId(block.id);
+              }}
+              onDblClick={() => !isDrawingTool && handleBlockDblClick(block.id)}
+              onDragEnd={(x, y) =>
+                updateBlock(currentImage.id, block.id, {
+                  editedX: Math.round(x),
+                  editedY: Math.round(y),
+                })
+              }
+              onTransformEnd={(x, y, width, height) =>
+                updateBlock(currentImage.id, block.id, {
+                  editedX: Math.round(x),
+                  editedY: Math.round(y),
+                  editedWidth: Math.round(width),
+                  editedHeight: Math.round(height),
+                })
+              }
+            />
+          ))}
+        </Layer>
+
 
         {/* Magic remover overlay layer — semi-transparent magenta */}
         <Layer>
@@ -647,17 +657,20 @@ export function EditorCanvas() {
             height: inlineEdit.height,
             fontSize: inlineEdit.fontSize,
             fontFamily: inlineEdit.fontFamily,
+            fontWeight: inlineEdit.bold ? "bold" : "normal",
+            fontStyle: inlineEdit.italic ? "italic" : "normal",
             color: inlineEdit.color,
             textAlign: inlineEdit.align as any,
             background: "rgba(0,0,0,0.15)",
             border: "2px solid #3b82f6",
             borderRadius: 4,
-            padding: 4,
+            boxSizing: "border-box",
+            padding: 0,
             resize: "both",
-            overflow: "auto",
+            overflow: "hidden",
             zIndex: 50,
             outline: "none",
-            lineHeight: 1.2,
+            lineHeight: inlineEdit.lineSpacing,
           }}
         />
       )}
