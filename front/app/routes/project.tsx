@@ -7,16 +7,17 @@ import {
   Image as ImageIcon,
   X,
   Play,
-  Trash2,
   Loader2,
   Languages,
   Focus,
-  Maximize,
   Layers,
   AlertCircle,
   ExternalLink,
   Info,
+  ChevronDown,
+  Check,
 } from "lucide-react";
+import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from "@headlessui/react";
 import {
   type StatusKey,
   processingStatuses,
@@ -30,10 +31,11 @@ import {
 } from "@/types";
 import {
   imageMimeTypes,
-  detectionResolutions,
   textDetectorOptions,
-  inpaintingSizes,
   inpainterOptions,
+  detectionResolutionOptions,
+  inpaintingSizeOptions,
+  type LocalizedOption,
 } from "@/config";
 import { loadSettings, saveSettings } from "@/utils/localStorage";
 import { initEditableBlocks } from "@/utils/initEditableBlocks";
@@ -616,17 +618,9 @@ function ProjectContent() {
                 <span className="text-[11px] font-bold text-slate-400 uppercase">{i.detection}</span>
               </div>
               <SidebarSelect label={i.textDetector} value={textDetector} onChange={setTextDetector}
-                options={textDetectorOptions.map((o) => ({ value: o.value, label: o.label }))} hint={i.hintTextDetector} />
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-600">{i.resolution}<InfoTooltip text={i.hintResolution} /></label>
-                <div className="relative">
-                  <select className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm pl-8 text-slate-900"
-                    value={detectionResolution} onChange={(e) => setDetectionResolution(e.target.value)}>
-                    {detectionResolutions.map((r) => <option key={r} value={String(r)}>{r}px</option>)}
-                  </select>
-                  <Maximize className="w-3.5 h-3.5 text-slate-300 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              </div>
+                options={textDetectorOptions} locale={locale} hint={i.hintTextDetector} />
+              <SidebarSelect label={i.resolution} value={detectionResolution} onChange={setDetectionResolution}
+                options={detectionResolutionOptions} locale={locale} hint={i.hintResolution} />
             </div>
             {/* Translation */}
             <div className="space-y-4">
@@ -636,14 +630,18 @@ function ProjectContent() {
               </div>
               <SidebarSelect label={i.targetLang} value={targetLanguage} onChange={setTargetLanguage}
                 options={[
-                  { value: "THA", label: locale === "th" ? "ไทย" : "Thai" },
-                  { value: "ENG", label: locale === "th" ? "อังกฤษ" : "English" },
-                  { value: "JPN", label: locale === "th" ? "ญี่ปุ่น" : "Japanese" },
-                  { value: "CHS", label: locale === "th" ? "จีน (ตัวย่อ)" : "Chinese (Simplified)" },
-                  { value: "KOR", label: locale === "th" ? "เกาหลี" : "Korean" },
-                ]} hint={i.hintTargetLang} />
+                  { value: "THA", label: { th: "ไทย", en: "Thai" } },
+                  { value: "ENG", label: { th: "อังกฤษ", en: "English" } },
+                  { value: "JPN", label: { th: "ญี่ปุ่น", en: "Japanese" } },
+                  { value: "CHS", label: { th: "จีน (ตัวย่อ)", en: "Chinese (Simplified)" } },
+                  { value: "KOR", label: { th: "เกาหลี", en: "Korean" } },
+                ]} locale={locale} hint={i.hintTargetLang} />
               <SidebarSelect label={i.renderDir} value={renderTextDirection} onChange={setRenderTextDirection}
-                options={[{ value: "auto", label: i.auto }, { value: "horizontal", label: i.horizontal }, { value: "vertical", label: i.vertical }]} hint={i.hintRenderDir} />
+                options={[
+                  { value: "auto", label: { th: "อัตโนมัติ", en: "Auto" } },
+                  { value: "horizontal", label: { th: "แนวนอน", en: "Horizontal" } },
+                  { value: "vertical", label: { th: "แนวตั้ง", en: "Vertical" } },
+                ]} locale={locale} hint={i.hintRenderDir} />
             </div>
             {/* Visuals */}
             <div className="space-y-4">
@@ -655,14 +653,9 @@ function ProjectContent() {
               <SliderInput label={i.unclipRatio} value={customUnclipRatio} min={0} max={5} step={0.01} onChange={setCustomUnclipRatio} hint={i.hintUnclipRatio} />
               <SliderInput label={i.maskDilation} value={maskDilationOffset} min={0} max={100} step={1} onChange={setMaskDilationOffset} hint={i.hintMaskDilation} />
               <SidebarSelect label={i.inpainter} value={inpainter} onChange={setInpainter}
-                options={inpainterOptions.map((o) => ({ value: o.value, label: o.label }))} hint={i.hintInpainter} />
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-600">{i.inpaintingSize}<InfoTooltip text={i.hintInpaintingSize} /></label>
-                <select className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900"
-                  value={inpaintingSize} onChange={(e) => setInpaintingSize(e.target.value)}>
-                  {inpaintingSizes.map((s) => <option key={s} value={String(s)}>{s}px</option>)}
-                </select>
-              </div>
+                options={inpainterOptions} locale={locale} hint={i.hintInpainter} />
+              <SidebarSelect label={i.inpaintingSize} value={inpaintingSize} onChange={setInpaintingSize}
+                options={inpaintingSizeOptions} locale={locale} hint={i.hintInpaintingSize} />
               <label className="flex items-center gap-3 cursor-pointer group">
                 <input type="checkbox" checked={skipOutsideBubble} onChange={(e) => setSkipOutsideBubble(e.target.checked)}
                   className="w-4 h-4 rounded border-slate-300 text-indigo-500 focus:ring-indigo-400" />
@@ -693,19 +686,42 @@ function ProjectContent() {
   );
 }
 
-function SidebarSelect({ label, value, onChange, options, hint }: {
+function SidebarSelect({ label, value, onChange, options, locale, hint }: {
   label: string; value: string; onChange: (v: string) => void;
-  options: { value: string; label: string }[]; hint?: string;
+  options: LocalizedOption[]; locale: Locale; hint?: string;
 }) {
+  const selected = options.find((o) => o.value === value) || options[0];
   return (
     <div className="space-y-1.5">
       <label className="text-xs font-semibold text-slate-600">{label}{hint && <InfoTooltip text={hint} />}</label>
-      <select
-        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none text-slate-900"
-        value={value} onChange={(e) => onChange(e.target.value)}
-      >
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
+      <Listbox value={value} onChange={onChange}>
+        <div className="relative">
+          <ListboxButton className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 text-left flex items-center justify-between focus:ring-2 focus:ring-indigo-500/20 outline-none cursor-pointer hover:border-slate-300 transition-colors">
+            <span>{selected?.label[locale]}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+          </ListboxButton>
+          <ListboxOptions
+            anchor="bottom"
+            className="w-[var(--button-width)] rounded-xl bg-white shadow-lg ring-1 ring-slate-200 z-50 mt-1 p-1 max-h-60 overflow-auto focus:outline-none [--anchor-gap:4px]"
+          >
+            {options.map((o) => (
+              <ListboxOption
+                key={o.value}
+                value={o.value}
+                className="relative cursor-pointer select-none rounded-lg px-3 py-2 text-sm text-slate-700 data-[focus]:bg-indigo-50 data-[selected]:bg-indigo-50 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium data-[selected]:text-indigo-700">{o.label[locale]}</span>
+                  {o.value === value && <Check className="w-3.5 h-3.5 text-indigo-600" />}
+                </div>
+                {o.description && (
+                  <p className="text-[11px] text-slate-400 mt-0.5">{o.description[locale]}</p>
+                )}
+              </ListboxOption>
+            ))}
+          </ListboxOptions>
+        </div>
+      </Listbox>
     </div>
   );
 }
