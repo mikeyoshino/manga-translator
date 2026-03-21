@@ -1,5 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import type { Route } from "./+types/landing";
+import { useLocale, useLocalePath, useT } from "@/context/LocaleContext";
+import type { Locale } from "@/context/LocaleContext";
+import { getMessages } from "@/i18n";
 import {
   Languages,
   Sparkles,
@@ -26,13 +30,42 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-export function meta() {
+const DOMAIN = "https://wunplae.com";
+
+export function meta({ params }: Route.MetaArgs) {
+  const lang = (params.lang as Locale) || "th";
+  const s = getMessages(lang).landing.seo;
+  const otherLang = lang === "th" ? "en" : "th";
+  const otherS = getMessages(otherLang).landing.seo;
+
   return [
-    { title: "Manga Translator — AI-Powered Manga & Webtoon Translation" },
+    { title: s.title },
+    { name: "description", content: s.description },
+    { property: "og:title", content: s.title },
+    { property: "og:description", content: s.description },
+    { property: "og:image", content: `${DOMAIN}/images/after-${lang}.webp` },
+    { property: "og:locale", content: s.ogLocale },
+    { property: "og:locale:alternate", content: otherS.ogLocale },
+    { property: "og:url", content: `${DOMAIN}/${lang}` },
+    { property: "og:type", content: "website" },
+    { tagName: "link", rel: "canonical", href: `${DOMAIN}/${lang}` },
     {
-      name: "description",
-      content:
-        "Translate manga and webtoons automatically with AI. Detect text, OCR, inpaint, translate, and render — all in one tool.",
+      tagName: "link",
+      rel: "alternate",
+      hrefLang: "th",
+      href: `${DOMAIN}/th`,
+    },
+    {
+      tagName: "link",
+      rel: "alternate",
+      hrefLang: "en",
+      href: `${DOMAIN}/en`,
+    },
+    {
+      tagName: "link",
+      rel: "alternate",
+      hrefLang: "x-default",
+      href: `${DOMAIN}/th`,
     },
   ];
 }
@@ -46,307 +79,12 @@ const featureIcons: LucideIcon[] = [
   Download, FolderTree, Layers, Zap, Cloud, Save,
 ];
 
-// --- Translation Dictionary ---
-const translations = {
-  th: {
-    nav: {
-      login: "เข้าสู่ระบบ",
-      startFree: "เริ่มต้นใช้งานฟรี",
-      lang: "EN",
-      switchLang: "en" as const,
-    },
-    hero: {
-      subhead:
-        "ตรวจจับ ลบ และแทนที่ข้อความในมังงะและคอมมิคโดยอัตโนมัติ — คงลายเส้นต้นฉบับไว้ รองรับกว่า 30 ภาษา",
-      cta: "เริ่มแปลฟรี (รับ 5 โทเคนฟรี)",
-      before: "ต้นฉบับ (ญี่ปุ่น)",
-      after: "แปลแล้ว (ไทย)",
-    },
-    steps: {
-      title: "วิธีการทำงาน",
-      s1: {
-        title: "1. อัปโหลด",
-        desc: "วางหน้ามังงะของคุณ (รองรับการอัปโหลดทีละหลายรูปเพื่อบริบทการแปลที่ดีขึ้น)",
-      },
-      s2: {
-        title: "2. AI แปลภาษา",
-        desc: "ระบบจะตรวจจับข้อความ ลบออกอย่างแนบเนียน แปลความหมาย และเรนเดอร์ข้อความใหม่",
-      },
-      s3: {
-        title: "3. แก้ไข & ดาวน์โหลด",
-        desc: "ปรับแต่งการแปลในเครื่องมือแก้ไขที่มีให้ จากนั้นกดดาวน์โหลดผลลัพธ์",
-      },
-    },
-    pipeline: {
-      title: "ฟีเจอร์ของระบบ AI (ทำงานอย่างไรเบื้องหลัง)",
-      steps: [
-        {
-          name: "Text Detection",
-          desc: "AI ค้นหาตำแหน่งของกรอบคำพูดและเอฟเฟกต์เสียงทั้งหมดด้วยโมเดล DBNET/CTD/CRAFT",
-        },
-        {
-          name: "OCR Recognition",
-          desc: "อ่านข้อความต้นฉบับด้วยโมเดล OCR ที่ปรับแต่งมาสำหรับมังงะโดยเฉพาะ",
-        },
-        {
-          name: "Smart Inpainting",
-          desc: "ลบข้อความต้นฉบับและสร้างพื้นหลังงานศิลป์ขึ้นมาทดแทนอย่างแนบเนียน (LaMa AI)",
-        },
-        {
-          name: "AI Translation",
-          desc: "แปลภาษาโดยเข้าใจบริบทด้วย GPT-4o — เข้าใจบทสนทนามังงะ สแลง และโทนเสียง",
-        },
-        {
-          name: "Text Rendering",
-          desc: "จัดวางข้อความที่แปลแล้วให้เข้ากับขนาดตัวอักษร สี และตำแหน่งเดิม",
-        },
-      ],
-    },
-    features: {
-      title: "เครื่องมือระดับโปร ที่ใช้งานง่าย",
-      editor: "เครื่องมือแก้ไข (Editor)",
-      project: "การจัดการโปรเจกต์",
-      items: [
-        {
-          title: "Visual Text Editor",
-          desc: "ปรับแต่งฟอนต์ ขนาด สี ตำแหน่ง การจัดแนว ตัวหนา/เอียง และขอบข้อความได้ทุกจุด",
-        },
-        {
-          title: "Magic Remover",
-          desc: "ระบายทับข้อความหรือสิ่งตกค้าง แล้ว AI จะจัดการลบและซ่อมแซมภาพให้",
-        },
-        {
-          title: "Manual Translate",
-          desc: "เลือกพื้นที่ที่ตกหล่นและสั่งรัน AI แปลภาษาเฉพาะจุดนั้นได้ทันที",
-        },
-        {
-          title: "Clone Stamp",
-          desc: "ซ่อมแซมพื้นหลังระดับพิกเซลโดยโคลนจากพื้นที่ใกล้เคียง",
-        },
-        {
-          title: "Pen & Eraser",
-          desc: "วาดหรือลบได้อย่างอิสระ สำหรับการจดโน้ตหรือตกแต่งเพิ่มเติม",
-        },
-        {
-          title: "Undo/Redo",
-          desc: "ประวัติการทำงานครบถ้วน ย้อนกลับได้ทุกการกระทำ",
-        },
-        {
-          title: "Batch Export",
-          desc: "ดาวน์โหลดเป็นภาพเดี่ยวหรือดาวน์โหลดทุกหน้าพร้อมกันเป็นไฟล์ ZIP",
-        },
-        {
-          title: "จัดกลุ่มโปรเจกต์",
-          desc: "รวบรวมมังงะเป็นตอนๆ ไว้ในโปรเจกต์เดียว (สูงสุด 5 โปรเจกต์ที่ใช้งานอยู่)",
-        },
-        {
-          title: "แปลพร้อมกันหลายหน้า",
-          desc: "อัปโหลดหลายหน้าและสั่งแปลทั้งหมดในครั้งเดียว ประหยัดเวลา",
-        },
-        {
-          title: "AI เข้าใจบริบท",
-          desc: "การอัปโหลดหลายหน้าช่วยให้ AI เข้าใจเนื้อเรื่อง และแปลได้แม่นยำขึ้น",
-        },
-        {
-          title: "Cloud Storage",
-          desc: "บันทึกผลลัพธ์พร้อมระบบหมดอายุอัตโนมัติ เข้าถึงได้จากทุกอุปกรณ์",
-        },
-        {
-          title: "Auto-Save",
-          desc: "บันทึกการแก้ไขอัตโนมัติขณะที่คุณกำลังทำงาน ไม่ต้องกลัวข้อมูลหาย",
-        },
-      ],
-    },
-    pricing: {
-      title: "ราคาที่เข้าใจง่าย",
-      subtitle:
-        "เลือกแพ็กเกจที่เหมาะกับคุณ ชำระเงินง่ายผ่าน PromptPay หรือบัตรเครดิต โทเคนเข้าทันที",
-      free: "สมัครสมาชิกรับฟรี 5 โทเคน (1 โทเคน = 1 รูป)",
-      tiers: [
-        { name: "Starter", price: "฿99", tokens: "50 รูป", popular: false },
-        { name: "Popular", price: "฿299", tokens: "200 รูป", popular: true },
-        {
-          name: "Best Value",
-          price: "฿599",
-          tokens: "500 รูป",
-          popular: false,
-        },
-      ],
-      choosePlan: "เลือกแพ็กเกจนี้",
-      mostPopular: "ยอดนิยม",
-    },
-    trust: {
-      title: "ความน่าเชื่อถือและความปลอดภัย",
-      items: [
-        "httpOnly cookie auth — โทเคนปลอดภัย ไม่ถูกเปิดเผยผ่าน JavaScript",
-        "Sentry error monitoring — ตรวจจับปัญหาและแก้ไขได้อย่างรวดเร็ว",
-        "GPU-powered workers — แปลภาษาได้รวดเร็วแม้ภาพความละเอียดสูง",
-      ],
-    },
-    footer: {
-      cta: "แปล 5 หน้าแรกของคุณฟรี — ไม่ต้องใช้บัตรเครดิต",
-      btn: "เริ่มต้นใช้งานเลย",
-      langs:
-        "รองรับภาษา: ไทย, อังกฤษ, ญี่ปุ่น, จีน (ตัวย่อ), เกาหลี และอีกกว่า 25 ภาษา",
-    },
-  },
-  en: {
-    nav: {
-      login: "Login",
-      startFree: "Start Free",
-      lang: "TH",
-      switchLang: "th" as const,
-    },
-    hero: {
-      subhead:
-        "Automatically detect, remove, and replace text in manga and comics — preserving the original art. Supports 30+ languages.",
-      cta: "Start Translating Free (5 free tokens)",
-      before: "Original (JP)",
-      after: "Translated (EN)",
-    },
-    steps: {
-      title: "How It Works",
-      s1: {
-        title: "1. Upload",
-        desc: "Drop your manga pages (supports batch upload for better context)",
-      },
-      s2: {
-        title: "2. AI Translates",
-        desc: "Our pipeline detects text, removes it cleanly, translates, and renders new text",
-      },
-      s3: {
-        title: "3. Edit & Export",
-        desc: "Fine-tune translations in the built-in editor, then download",
-      },
-    },
-    pipeline: {
-      title: "AI Pipeline Features (Under the Hood)",
-      steps: [
-        {
-          name: "Text Detection",
-          desc: "AI locates every text bubble and sound effect using DBNET/CTD/CRAFT models",
-        },
-        {
-          name: "OCR Recognition",
-          desc: "Reads the original text with specialized manga OCR models",
-        },
-        {
-          name: "Smart Inpainting",
-          desc: "Removes original text and reconstructs the background art seamlessly (LaMa AI)",
-        },
-        {
-          name: "AI Translation",
-          desc: "Translates with context awareness using GPT-4o — understands manga dialogue, slang, and tone",
-        },
-        {
-          name: "Text Rendering",
-          desc: "Places translated text with matched font size, color, and position",
-        },
-      ],
-    },
-    features: {
-      title: "Pro Tools, Easy to Use",
-      editor: "Editor Tools",
-      project: "Project Management",
-      items: [
-        {
-          title: "Visual Text Editor",
-          desc: "Adjust font, size, color, position, alignment, bold/italic, text stroke for every text block",
-        },
-        {
-          title: "Magic Remover",
-          desc: "Paint over leftover text or artifacts and AI inpaints them away",
-        },
-        {
-          title: "Manual Translate",
-          desc: "Select a missed region and run AI translation on just that area",
-        },
-        {
-          title: "Clone Stamp",
-          desc: "Pixel-level background repair by cloning from nearby areas",
-        },
-        {
-          title: "Pen & Eraser",
-          desc: "Freehand drawing for annotations or touch-ups",
-        },
-        { title: "Undo/Redo", desc: "Full history for every action" },
-        {
-          title: "Batch Export",
-          desc: "Download single images or all pages as ZIP",
-        },
-        {
-          title: "Organize by Project",
-          desc: "Group manga chapters into projects (up to 5 active)",
-        },
-        {
-          title: "Batch Translation",
-          desc: "Upload multiple pages and translate all at once",
-        },
-        {
-          title: "Context-Aware AI",
-          desc: "Multi-page upload helps AI understand story context for more accurate translations",
-        },
-        {
-          title: "Cloud Storage",
-          desc: "Results saved with auto-expiry, accessible from any device",
-        },
-        {
-          title: "Auto-Save",
-          desc: "Edits saved automatically as you work",
-        },
-      ],
-    },
-    pricing: {
-      title: "Simple Pricing",
-      subtitle:
-        "Pay via PromptPay QR or Credit/Debit Card. Tokens credited instantly.",
-      free: "5 Free Tokens on signup (1 token = 1 image)",
-      tiers: [
-        {
-          name: "Starter",
-          price: "฿99",
-          tokens: "50 images",
-          popular: false,
-        },
-        {
-          name: "Popular",
-          price: "฿299",
-          tokens: "200 images",
-          popular: true,
-        },
-        {
-          name: "Best Value",
-          price: "฿599",
-          tokens: "500 images",
-          popular: false,
-        },
-      ],
-      choosePlan: "Choose Plan",
-      mostPopular: "Most Popular",
-    },
-    trust: {
-      title: "Trust & Security",
-      items: [
-        "httpOnly cookie auth — tokens never exposed to JavaScript",
-        "Sentry error monitoring — issues caught and resolved fast",
-        "GPU-powered workers — fast translation even at high resolution",
-      ],
-    },
-    footer: {
-      cta: "Translate your first 5 pages free — no credit card required.",
-      btn: "Get Started",
-      langs:
-        "Supported Languages: Thai, English, Japanese, Chinese (Simplified), Korean — and 25+ more",
-    },
-  },
-};
-
-type Lang = keyof typeof translations;
-
 export default function LandingPage() {
-  const [lang, setLang] = useState<Lang>("th");
+  const lang = useLocale();
+  const lp = useLocalePath();
+  const otherLocale = lang === "th" ? "en" : "th";
   const [sliderPosition, setSliderPosition] = useState(50);
-  const t = translations[lang];
+  const t = useT().landing;
 
   const handleMove = (e: React.MouseEvent<HTMLDivElement> | React.Touch) => {
     const target =
@@ -402,25 +140,25 @@ export default function LandingPage() {
                 <Languages className="w-5 h-5" />
               </div>
               <span className="font-semibold text-xl tracking-tight text-slate-900">
-                Manga Translator
+                WunPlae
               </span>
             </div>
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => setLang(t.nav.switchLang)}
+              <Link
+                to={`/${otherLocale}`}
                 className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-full"
               >
                 <Languages className="w-4 h-4" />
                 {t.nav.lang}
-              </button>
+              </Link>
               <Link
-                to="/login"
+                to={lp("/login")}
                 className="hidden sm:block text-slate-600 font-medium hover:text-indigo-600 transition-colors"
               >
                 {t.nav.login}
               </Link>
               <Link
-                to="/login"
+                to={lp("/login")}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium shadow-sm shadow-indigo-200 transition-all hover:-translate-y-0.5"
               >
                 {t.nav.startFree}
@@ -439,30 +177,18 @@ export default function LandingPage() {
               <span>AI-Powered Manga Translation</span>
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-[1.15] text-slate-900">
-              {lang === "th" ? (
-                <>
-                  แปลมังงะใน
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
-                    ไม่กี่วินาที
-                  </span>
-                  <br />
-                  ด้วย AI
-                </>
-              ) : (
-                <>
-                  Translate Manga in{" "}
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
-                    Seconds
-                  </span>
-                </>
-              )}
+              {t.hero.titleLine1}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+                {t.hero.titleHighlight}
+              </span>
+              {t.hero.titleLine2 && <><br />{t.hero.titleLine2}</>}
             </h1>
             <p className="text-lg text-slate-600 leading-relaxed max-w-xl">
               {t.hero.subhead}
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link
-                to="/login"
+                to={lp("/login")}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-semibold text-lg shadow-lg shadow-indigo-200 transition-all hover:-translate-y-1 flex justify-center items-center gap-2"
               >
                 {t.hero.cta} <ArrowRight className="w-5 h-5" />
@@ -497,7 +223,7 @@ export default function LandingPage() {
                 }}
               >
                 <img
-                  src="/images/after.webp"
+                  src={`/images/after-${lang}.webp`}
                   alt="Translated manga page"
                   className="w-full h-full object-cover"
                   draggable={false}
@@ -707,7 +433,7 @@ export default function LandingPage() {
                   </span>
                 </div>
                 <Link
-                  to="/login"
+                  to={lp("/login")}
                   className={`block w-full py-3.5 rounded-xl font-semibold text-center transition-all ${
                     tier.popular
                       ? "bg-white text-indigo-600 hover:bg-slate-50 shadow-sm"
@@ -751,7 +477,7 @@ export default function LandingPage() {
               {t.footer.cta}
             </h2>
             <Link
-              to="/login"
+              to={lp("/login")}
               className="inline-block bg-white text-indigo-600 px-10 py-4 rounded-2xl font-semibold text-lg hover:bg-slate-50 shadow-sm transition-transform hover:-translate-y-1 relative z-10"
             >
               {t.footer.btn}
@@ -763,10 +489,10 @@ export default function LandingPage() {
               <div className="bg-indigo-600 p-1.5 rounded-lg">
                 <Languages className="w-4 h-4 text-white" />
               </div>
-              Manga Translator
+              WunPlae
             </div>
             <p>
-              &copy; {new Date().getFullYear()} Manga Translator. All rights
+              &copy; {new Date().getFullYear()} WunPlae. All rights
               reserved.
             </p>
           </div>

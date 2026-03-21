@@ -6,7 +6,7 @@ import { ClientOnlyCanvas } from "@/components/editor/ClientOnlyCanvas";
 import { AuthGuard } from "@/components/AuthGuard";
 import { useNavigate } from "react-router";
 import { useEffect, useState } from "react";
-import { getEditorLocale, editorT } from "@/utils/editorI18n";
+import { useT, useLocalePath } from "@/context/LocaleContext";
 
 // Force client-side rendering for this route
 export const clientLoader = async () => {
@@ -15,11 +15,9 @@ export const clientLoader = async () => {
 clientLoader.hydrate = true as const;
 
 export function HydrateFallback() {
-  const locale = getEditorLocale();
-  const i = editorT[locale];
   return (
     <div className="flex items-center justify-center h-screen bg-slate-50 text-slate-600">
-      <p>{i.loadingEditor}</p>
+      <p>กำลังโหลดตัวแก้ไข...</p>
     </div>
   );
 }
@@ -36,8 +34,8 @@ function EditorContent() {
   const { images, currentImage, undo, redo } = useEditor();
   const navigate = useNavigate();
   const [isClient, setIsClient] = useState(false);
-  const locale = getEditorLocale();
-  const i = editorT[locale];
+  const lp = useLocalePath();
+  const i = useT().editor;
 
   useEffect(() => {
     setIsClient(true);
@@ -69,7 +67,7 @@ function EditorContent() {
 
   useEffect(() => {
     if (isClient && images.length === 0) {
-      navigate("/studio");
+      navigate(lp("/studio"));
     }
   }, [images, navigate, isClient]);
 

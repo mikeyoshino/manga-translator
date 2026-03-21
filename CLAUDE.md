@@ -92,6 +92,56 @@ Translators can be chained: `--translator "chatgpt:JPN;sugoi:ENG"` runs ChatGPT 
 - pytest + pytest-asyncio for testing
 - Docker base: `pytorch/pytorch:2.5.1-cuda11.8-cudnn9-runtime`
 
+## Frontend i18n & Locale Routing
+
+### URL-based Locale
+All frontend routes are prefixed with `/:lang` (`/th`, `/en`). The locale is determined by the URL, not localStorage. Visiting `/` redirects to `/th` or `/en` based on the `Accept-Language` header (defaults to Thai).
+
+### Route Structure (`front/app/routes.ts`)
+```
+/                    → root-redirect.tsx (redirects to /:lang)
+/:lang               → locale-layout.tsx (validates lang, provides LocaleProvider)
+  ├── /              → landing.tsx
+  ├── /login         → login.tsx
+  ├── /studio        → home.tsx
+  ├── /studio/editor → editor.tsx
+  └── ...
+/login, /studio/*    → legacy-redirect.tsx (redirects old URLs to /th/...)
+```
+
+### Translation Files
+Translations are centralized in JSON files (Angular-style):
+```
+front/app/i18n/
+├── th.json    ← all Thai strings, namespaced by page
+├── en.json    ← all English strings, namespaced by page
+└── index.ts   ← getMessages(locale) with TypeScript types
+```
+
+JSON keys are namespaced: `landing`, `login`, `navbar`, `home`, `project`, `topup`, `profile`, `tokenUsage`, `editor`.
+
+### Hooks (`front/app/context/LocaleContext.tsx`)
+- `useLocale()` — returns current locale (`"th" | "en"`) from URL param
+- `useLocalePath()` — returns `(path) => "/${locale}${path}"` for building locale-prefixed links
+- `useT()` — returns the full typed translations object for the current locale (e.g. `useT().landing.hero.cta`)
+
+### Adding a New Translation
+1. Add the key to both `front/app/i18n/th.json` and `front/app/i18n/en.json` under the appropriate namespace
+2. Use `const i = useT().namespace` in the component
+3. Reference as `i.yourKey` — fully typed via TypeScript inference
+
+### Adding a New Language
+1. Create `front/app/i18n/xx.json` copying the structure from `th.json`
+2. Add `"xx"` to `SUPPORTED_LOCALES` in `front/app/context/LocaleContext.tsx`
+3. Add the locale to the `messages` record in `front/app/i18n/index.ts`
+4. Add hreflang `<link>` tags in `landing.tsx` `meta()` function
+
+### SEO
+- Each locale gets its own URL (`/th`, `/en`) indexable by search engines
+- `meta()` functions return locale-aware `<title>`, `<meta description>`, OG tags, hreflang, and canonical URLs
+- Domain for SEO tags: `WunPlae.com`
+- Landing page after image is locale-specific: `/images/after-th.webp`, `/images/after-en.webp`
+
 ## Observability & Logging Rules
 
 - **Always add structured logging** when writing new code. Use `logging.getLogger(__name__)` and log key operations (start, success, failure) with relevant context (IDs, durations, error details).

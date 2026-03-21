@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
+import { useLocale, useLocalePath, useT } from "@/context/LocaleContext";
 import {
   Coins,
   Plus,
@@ -16,64 +17,14 @@ import type { Project } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
-type Locale = "th" | "en";
-const t = {
-  th: {
-    projects: "โปรเจกต์",
-    createProject: "สร้างโปรเจกต์",
-    projectName: "ชื่อโปรเจกต์",
-    noProjects: "ยังไม่มีโปรเจกต์",
-    noProjectsDesc: "สร้างโปรเจกต์เพื่อเริ่มแปลมังงะ",
-    create: "สร้าง",
-    cancel: "ยกเลิก",
-    daysLeft: "เหลือ {n} วัน",
-    deleteProject: "ลบโปรเจกต์",
-    confirmDelete: "คุณแน่ใจหรือไม่ว่าต้องการลบโปรเจกต์นี้?",
-    images: "รูป",
-    maxProjects: "คุณมีโปรเจกต์ได้สูงสุด 5 โปรเจกต์ กรุณาลบโปรเจกต์เก่าก่อน",
-    adminUnlimited: "ผู้ดูแล (ไม่จำกัด)",
-    tokens: "โทเค็น",
-    signOut: "ออกจากระบบ",
-    profile: "โปรไฟล์",
-    subscription: "แพ็กเกจสมาชิก",
-    tokenUsage: "การใช้โทเค็น",
-    loading: "กำลังโหลด...",
-    welcomeTitle: "ยินดีต้อนรับ! คุณได้รับ 5 โทเค็นฟรี",
-    welcomeDesc: "แปลมังงะได้ฟรี 5 รูปเลย — สร้างโปรเจกต์แรกของคุณเพื่อเริ่มต้น!",
-    dismiss: "เข้าใจแล้ว",
-  },
-  en: {
-    projects: "Projects",
-    createProject: "Create Project",
-    projectName: "Project Name",
-    noProjects: "No projects yet",
-    noProjectsDesc: "Create a project to start translating manga",
-    create: "Create",
-    cancel: "Cancel",
-    daysLeft: "{n} days left",
-    deleteProject: "Delete Project",
-    confirmDelete: "Are you sure you want to delete this project?",
-    images: "images",
-    maxProjects: "Maximum 5 active projects. Please delete an old project first.",
-    adminUnlimited: "Admin (Unlimited)",
-    tokens: "Tokens",
-    signOut: "Sign out",
-    profile: "Profile",
-    subscription: "Subscription",
-    tokenUsage: "Token Usage",
-    loading: "Loading...",
-    welcomeTitle: "Welcome! You got 5 free tokens",
-    welcomeDesc: "Translate 5 manga images for free — create your first project to get started!",
-    dismiss: "Got it",
-  },
-} as const;
 
 export const App: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
 
-  const [locale, setLocale] = useState<Locale>(() => (localStorage.getItem("manga-translator-locale") as Locale) || "th");
-  const i = t[locale];
+  const locale = useLocale();
+  const lp = useLocalePath();
+  const i = useT().home;
 
   const [showWelcome, setShowWelcome] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -83,10 +34,6 @@ export const App: React.FC = () => {
     setShowWelcome(false);
     localStorage.setItem("manga-translator-welcome-dismissed", "1");
   };
-
-  useEffect(() => {
-    localStorage.setItem("manga-translator-locale", locale);
-  }, [locale]);
 
   // Project state
   const [projectList, setProjectList] = useState<Project[]>([]);
@@ -133,7 +80,7 @@ export const App: React.FC = () => {
       const project = await res.json();
       setShowCreateModal(false);
       setNewProjectName("");
-      navigate(`/studio/projects/${project.id}`);
+      navigate(lp(`/studio/projects/${project.id}`));
     } catch {
       setCreateError("Network error");
     } finally {
@@ -163,7 +110,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
-      <Navbar showLanguageToggle locale={locale} onLocaleChange={setLocale} />
+      <Navbar showLanguageToggle />
 
       {/* Main Content — Project List */}
       <main className="flex-1 overflow-y-auto p-6">
@@ -214,7 +161,7 @@ export const App: React.FC = () => {
                 return (
                   <div
                     key={project.id}
-                    onClick={() => navigate(`/studio/projects/${project.id}`)}
+                    onClick={() => navigate(lp(`/studio/projects/${project.id}`))}
                     className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer group"
                   >
                     {/* Thumbnail */}
@@ -272,7 +219,7 @@ export const App: React.FC = () => {
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleCreateProject(); }}
-                  placeholder={locale === "th" ? "เช่น วันพีซ ตอน 1-10" : "e.g. One Piece Ch 1-10"}
+                  placeholder={i.projectNamePlaceholder}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none"
                 />
               </div>

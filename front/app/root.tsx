@@ -6,11 +6,15 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useMatches,
 } from "react-router";
 import type { Route } from "./+types/root";
 import "./app.css";
 import { EditorProvider } from "@/context/EditorContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { useEffect } from "react";
+import { SUPPORTED_LOCALES, DEFAULT_LOCALE } from "@/context/LocaleContext";
+import type { Locale } from "@/context/LocaleContext";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -27,7 +31,7 @@ export const links: Route.LinksFunction = () => [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="th">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -44,6 +48,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const matches = useMatches();
+  const langParam = matches.find((m) => m.params.lang)?.params.lang;
+  const locale: Locale = SUPPORTED_LOCALES.includes(langParam as Locale)
+    ? (langParam as Locale)
+    : DEFAULT_LOCALE;
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
+
   return (
     <AuthProvider>
       <EditorProvider>

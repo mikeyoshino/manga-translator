@@ -5,6 +5,7 @@ import { supabase } from "@/utils/supabase";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Navbar } from "@/components/Navbar";
 import { apiFetch } from "@/utils/api";
+import { useLocale, useLocalePath, useT } from "@/context/LocaleContext";
 import {
   User,
   Mail,
@@ -17,84 +18,12 @@ import {
   ExternalLink,
 } from "lucide-react";
 
-type Locale = "th" | "en";
-
-const t = {
-  th: {
-    profile: "โปรไฟล์",
-    back: "กลับ",
-    accountInfo: "ข้อมูลบัญชี",
-    email: "อีเมล",
-    displayName: "ชื่อที่แสดง",
-    displayNamePlaceholder: "กรอกชื่อที่แสดง",
-    memberSince: "สมาชิกตั้งแต่",
-    role: "บทบาท",
-    admin: "ผู้ดูแลระบบ",
-    member: "สมาชิก",
-    save: "บันทึก",
-    saving: "กำลังบันทึก...",
-    saveSuccess: "บันทึกสำเร็จ",
-    saveFailed: "บันทึกไม่สำเร็จ",
-    tokenBalance: "โทเค็นคงเหลือ",
-    tokens: "โทเค็น",
-    topUp: "เติมโทเค็น",
-    viewUsage: "ดูการใช้งาน",
-    security: "ความปลอดภัย",
-    changePassword: "เปลี่ยนรหัสผ่าน",
-    newPassword: "รหัสผ่านใหม่",
-    confirmPassword: "ยืนยันรหัสผ่านใหม่",
-    updatePassword: "อัปเดตรหัสผ่าน",
-    updating: "กำลังอัปเดต...",
-    passwordSuccess: "เปลี่ยนรหัสผ่านสำเร็จ",
-    passwordFailed: "เปลี่ยนรหัสผ่านไม่สำเร็จ",
-    passwordMismatch: "รหัสผ่านไม่ตรงกัน",
-    passwordTooShort: "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร",
-    currentPassword: "รหัสผ่านปัจจุบัน",
-    currentPasswordRequired: "กรุณากรอกรหัสผ่านปัจจุบัน",
-    currentPasswordWrong: "รหัสผ่านปัจจุบันไม่ถูกต้อง",
-    adminUnlimited: "ไม่จำกัด",
-  },
-  en: {
-    profile: "Profile",
-    back: "Back",
-    accountInfo: "Account Info",
-    email: "Email",
-    displayName: "Display Name",
-    displayNamePlaceholder: "Enter display name",
-    memberSince: "Member since",
-    role: "Role",
-    admin: "Admin",
-    member: "Member",
-    save: "Save",
-    saving: "Saving...",
-    saveSuccess: "Saved successfully",
-    saveFailed: "Failed to save",
-    tokenBalance: "Token Balance",
-    tokens: "tokens",
-    topUp: "Top Up",
-    viewUsage: "View Usage",
-    security: "Security",
-    changePassword: "Change Password",
-    newPassword: "New Password",
-    confirmPassword: "Confirm New Password",
-    updatePassword: "Update Password",
-    updating: "Updating...",
-    passwordSuccess: "Password changed successfully",
-    passwordFailed: "Failed to change password",
-    passwordMismatch: "Passwords do not match",
-    passwordTooShort: "Password must be at least 6 characters",
-    currentPassword: "Current Password",
-    currentPasswordRequired: "Current password is required",
-    currentPasswordWrong: "Current password is incorrect",
-    adminUnlimited: "Unlimited",
-  },
-} as const;
-
 function ProfileContent() {
   const { user, tokenBalance, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const locale = (typeof window !== "undefined" ? localStorage.getItem("manga-translator-locale") as Locale : null) || "th";
-  const i = t[locale];
+  const locale = useLocale();
+  const lp = useLocalePath();
+  const i = useT().profile;
 
   // Display name
   const [displayName, setDisplayName] = useState("");
@@ -291,14 +220,14 @@ function ProfileContent() {
             <div className="flex gap-3">
               {!isAdmin && (
                 <button
-                  onClick={() => navigate("/studio/topup")}
+                  onClick={() => navigate(lp("/studio/topup"))}
                   className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors"
                 >
                   <Coins className="w-4 h-4" /> {i.topUp}
                 </button>
               )}
               <button
-                onClick={() => navigate("/studio/token-usage")}
+                onClick={() => navigate(lp("/studio/token-usage"))}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-200 transition-colors"
               >
                 <ExternalLink className="w-4 h-4" /> {i.viewUsage}

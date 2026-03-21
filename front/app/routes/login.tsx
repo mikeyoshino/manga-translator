@@ -2,10 +2,13 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/context/AuthContext";
 import { BookOpen } from "lucide-react";
+import { useLocalePath, useT } from "@/context/LocaleContext";
 
 export default function LoginPage() {
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
+  const lp = useLocalePath();
+  const i = useT().login;
 
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
@@ -18,7 +21,7 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate("/studio");
+      navigate(lp("/studio"));
     }
   }, [user, navigate]);
 
@@ -42,7 +45,7 @@ export default function LoginPage() {
         if (err) {
           setError(err.message);
         } else {
-          navigate("/studio");
+          navigate(lp("/studio"));
         }
       }
     } finally {
@@ -54,15 +57,15 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm w-full max-w-md text-center">
-          <h2 className="text-2xl font-bold text-emerald-600 mb-4">Check your email</h2>
+          <h2 className="text-2xl font-bold text-emerald-600 mb-4">{i.checkEmail}</h2>
           <p className="text-slate-600 mb-6">
-            We sent a confirmation link to <strong>{email}</strong>. Please verify your email to sign in.
+            {i.confirmationSent} <strong>{email}</strong>. {i.verifyEmail}
           </p>
           <button
             onClick={() => { setSignUpSuccess(false); setIsSignUp(false); }}
             className="text-indigo-600 hover:text-indigo-500 font-medium"
           >
-            Back to Sign In
+            {i.backToSignIn}
           </button>
         </div>
       </div>
@@ -76,11 +79,11 @@ export default function LoginPage() {
           <div className="bg-indigo-600 p-1.5 rounded-lg mr-2">
             <BookOpen className="text-white w-5 h-5" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">Manga Translator</h1>
+          <h1 className="text-2xl font-bold text-slate-800">WunPlae</h1>
         </div>
 
         <h2 className="text-xl font-semibold text-center text-slate-800 mb-6">
-          {isSignUp ? "Create Account" : "Sign In"}
+          {isSignUp ? i.createAccount : i.signIn}
         </h2>
 
         {error && (
@@ -92,29 +95,29 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {isSignUp && (
             <div>
-              <label className="block text-sm font-semibold text-slate-600 mb-1">Display Name</label>
+              <label className="block text-sm font-semibold text-slate-600 mb-1">{i.displayName}</label>
               <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-gray-900"
-                placeholder="Your name"
+                placeholder={i.displayNamePlaceholder}
               />
             </div>
           )}
           <div>
-            <label className="block text-sm font-semibold text-slate-600 mb-1">Email</label>
+            <label className="block text-sm font-semibold text-slate-600 mb-1">{i.email}</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-gray-900"
-              placeholder="you@example.com"
+              placeholder={i.emailPlaceholder}
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-slate-600 mb-1">Password</label>
+            <label className="block text-sm font-semibold text-slate-600 mb-1">{i.password}</label>
             <input
               type="password"
               required
@@ -122,7 +125,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-gray-900"
-              placeholder="At least 6 characters"
+              placeholder={i.passwordPlaceholder}
             />
           </div>
           <button
@@ -130,17 +133,17 @@ export default function LoginPage() {
             disabled={submitting}
             className="w-full py-2 px-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all font-bold shadow-lg shadow-indigo-200"
           >
-            {submitting ? "Please wait..." : isSignUp ? "Sign Up" : "Sign In"}
+            {submitting ? i.submitting : isSignUp ? i.signUp : i.signIn}
           </button>
         </form>
 
         <p className="mt-4 text-center text-sm text-slate-600">
-          {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
+          {isSignUp ? i.alreadyHaveAccount : i.noAccount}{" "}
           <button
             onClick={() => { setIsSignUp(!isSignUp); setError(null); }}
             className="text-indigo-600 hover:text-indigo-500 font-medium"
           >
-            {isSignUp ? "Sign In" : "Sign Up"}
+            {isSignUp ? i.signIn : i.signUp}
           </button>
         </p>
       </div>

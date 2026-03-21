@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Navbar } from "@/components/Navbar";
 import { apiFetch } from "@/utils/api";
+import { useLocale, useT } from "@/context/LocaleContext";
 import {
   Coins,
   ArrowUpCircle,
@@ -12,8 +13,6 @@ import {
   Loader2,
   Inbox,
 } from "lucide-react";
-
-type Locale = "th" | "en";
 
 interface Transaction {
   id: string;
@@ -25,72 +24,13 @@ interface Transaction {
   created_at: string;
 }
 
-const t = {
-  th: {
-    title: "การใช้โทเค็น",
-    back: "กลับ",
-    currentBalance: "ยอดคงเหลือ",
-    totalSpent: "ใช้ไปทั้งหมด",
-    totalTopUp: "เติมทั้งหมด",
-    tokens: "โทเค็น",
-    date: "วันที่",
-    type: "ประเภท",
-    description: "รายละเอียด",
-    reference: "อ้างอิง",
-    amount: "จำนวน",
-    balance: "คงเหลือ",
-    topup: "เติมเงิน",
-    translation: "แปลรูป",
-    refund: "คืนเงิน",
-    topupDesc: "เติมโทเค็น",
-    translationDesc: "แปลรูปภาพ",
-    refundDesc: "คืนโทเค็น",
-    loadMore: "โหลดเพิ่มเติม",
-    loading: "กำลังโหลด...",
-    empty: "ยังไม่มีรายการ",
-    emptyDesc: "เมื่อคุณใช้โทเค็นแปลรูปหรือเติมเงิน รายการจะแสดงที่นี่",
-    channelPromptpay: "พร้อมเพย์",
-    channelCard: "บัตรเครดิต/เดบิต",
-    channelApi: "API",
-    channelSystem: "ระบบ",
-  },
-  en: {
-    title: "Token Usage",
-    back: "Back",
-    currentBalance: "Current Balance",
-    totalSpent: "Total Spent",
-    totalTopUp: "Total Topped Up",
-    tokens: "tokens",
-    date: "Date",
-    type: "Type",
-    description: "Description",
-    reference: "Reference",
-    amount: "Amount",
-    balance: "Balance",
-    topup: "Top-up",
-    translation: "Translation",
-    refund: "Refund",
-    topupDesc: "Token top-up",
-    translationDesc: "Image translation",
-    refundDesc: "Token refund",
-    loadMore: "Load More",
-    loading: "Loading...",
-    empty: "No transactions yet",
-    emptyDesc: "When you translate images or top up tokens, your transactions will appear here.",
-    channelPromptpay: "PromptPay",
-    channelCard: "Credit/Debit Card",
-    channelApi: "API",
-    channelSystem: "System",
-  },
-} as const;
-
 const PAGE_SIZE = 20;
 
 function TokenUsageContent() {
   const { user, tokenBalance, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const locale = (typeof window !== "undefined" ? localStorage.getItem("manga-translator-locale") as Locale : null) || "th";
-  const i = t[locale];
+  const locale = useLocale();
+  const i = useT().tokenUsage;
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);

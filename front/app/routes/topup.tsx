@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Navbar } from "@/components/Navbar";
 import { apiFetch } from "@/utils/api";
+import { useLocalePath, useT } from "@/context/LocaleContext";
 import {
   ArrowLeft,
   Coins,
@@ -18,107 +19,8 @@ import {
   Smartphone,
 } from "lucide-react";
 
-type Locale = "th" | "en";
 type PaymentMethod = "promptpay" | "card";
 
-const t = {
-  th: {
-    topUp: "เติมโทเค็น",
-    currentBalance: "ยอดคงเหลือ",
-    tokens: "โทเค็น",
-    perImage: "1 โทเค็น = 1 รูปที่แปล (AI-Powered)",
-    images: "รูป",
-    chapters: "ตอนมังงะ",
-    pagesEach: "~5 หน้า/ตอน",
-    perImagePrice: "บาท / รูป",
-    save: "ประหยัด",
-    vsStarter: "จากแพ็กเริ่มต้น",
-    buyNow: "ซื้อเลย",
-    processing: "กำลังดำเนินการ...",
-    mostPopular: "ยอดนิยม",
-    starter: "เริ่มต้น",
-    popular: "ยอดนิยม",
-    bestValue: "คุ้มที่สุด",
-    whatYouGet: "ทุกรูปประกอบด้วย",
-    textDetection: "ตรวจจับข้อความ",
-    ocrRecognition: "OCR อ่านข้อความ",
-    aiTranslation: "AI แปลภาษา",
-    inpainting: "ลบข้อความเดิม",
-    textRendering: "ใส่ข้อความแปล",
-    paymentNote: "โทเค็นจะเข้าทันทีหลังชำระ",
-    scanQr: "สแกน QR เพื่อชำระเงิน",
-    scanQrDesc: "เปิดแอปธนาคารแล้วสแกน QR Code พร้อมเพย์",
-    openPayment: "เปิดหน้าชำระเงิน",
-    waitingPayment: "กำลังรอการยืนยันการชำระเงิน...",
-    cancel: "ยกเลิก",
-    paymentSuccess: "ชำระเงินสำเร็จ!",
-    tokensCredited: "โทเค็นได้ถูกเพิ่มเข้าบัญชีของคุณแล้ว",
-    startTranslating: "เริ่มแปลเลย",
-    buyMore: "ซื้อเพิ่ม",
-    back: "กลับ",
-    choosePayment: "เลือกวิธีชำระเงิน",
-    promptpay: "พร้อมเพย์",
-    promptpayDesc: "สแกน QR ผ่านแอปธนาคาร",
-    creditCard: "บัตรเครดิต / เดบิต",
-    creditCardDesc: "Visa, Mastercard, JCB",
-    continuePayment: "ดำเนินการชำระเงิน",
-    cardNumber: "หมายเลขบัตร",
-    cardName: "ชื่อบนบัตร",
-    expiry: "วันหมดอายุ",
-    cvv: "CVV",
-    payAmount: "ชำระ",
-    cardProcessing: "กำลังประมวลผลบัตร...",
-    selected: "เลือกแล้ว",
-  },
-  en: {
-    topUp: "Top Up Tokens",
-    currentBalance: "Current balance",
-    tokens: "tokens",
-    perImage: "1 token = 1 image translated (AI-Powered)",
-    images: "images",
-    chapters: "manga chapters",
-    pagesEach: "~5 pages each",
-    perImagePrice: "THB / image",
-    save: "Save",
-    vsStarter: "vs Starter",
-    buyNow: "Buy Now",
-    processing: "Processing...",
-    mostPopular: "MOST POPULAR",
-    starter: "Starter",
-    popular: "Popular",
-    bestValue: "Best Value",
-    whatYouGet: "What you get per image",
-    textDetection: "Text detection",
-    ocrRecognition: "OCR recognition",
-    aiTranslation: "AI translation",
-    inpainting: "Inpainting",
-    textRendering: "Text rendering",
-    paymentNote: "Tokens are credited instantly after payment.",
-    scanQr: "Scan QR Code to Pay",
-    scanQrDesc: "Open your banking app and scan this PromptPay QR code.",
-    openPayment: "Open Payment Page",
-    waitingPayment: "Waiting for payment confirmation...",
-    cancel: "Cancel",
-    paymentSuccess: "Payment Successful!",
-    tokensCredited: "Tokens have been credited to your account.",
-    startTranslating: "Start Translating",
-    buyMore: "Buy More",
-    back: "Back",
-    choosePayment: "Choose payment method",
-    promptpay: "PromptPay",
-    promptpayDesc: "Scan QR via banking app",
-    creditCard: "Credit / Debit Card",
-    creditCardDesc: "Visa, Mastercard, JCB",
-    continuePayment: "Continue to Payment",
-    cardNumber: "Card Number",
-    cardName: "Name on Card",
-    expiry: "Expiry",
-    cvv: "CVV",
-    payAmount: "Pay",
-    cardProcessing: "Processing card...",
-    selected: "Selected",
-  },
-} as const;
 
 const PACKAGES = [
   { tokens: 50, price: 99, key: "starter" as const, icon: Sparkles, highlight: false },
@@ -144,8 +46,8 @@ declare global {
 function TopUpContent() {
   const { tokenBalance, isAdmin, refreshBalance } = useAuth();
   const navigate = useNavigate();
-  const locale = (typeof window !== "undefined" ? localStorage.getItem("manga-translator-locale") as Locale : null) || "th";
-  const i = t[locale];
+  const lp = useLocalePath();
+  const i = useT().topup;
 
   // Flow steps: "packages" → "payment" → "processing" → "success"
   const [step, setStep] = useState<"packages" | "payment" | "processing" | "success">("packages");
@@ -360,7 +262,7 @@ function TopUpContent() {
           <p className="text-sm text-slate-500 mb-2">{i.tokensCredited}</p>
           <p className="text-3xl font-bold text-indigo-600 mb-6">{tokenBalance} {i.tokens}</p>
           <div className="flex gap-3 justify-center">
-            <button onClick={() => navigate("/studio")} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors text-sm font-bold shadow-lg shadow-indigo-200">
+            <button onClick={() => navigate(lp("/studio"))} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors text-sm font-bold shadow-lg shadow-indigo-200">
               {i.startTranslating}
             </button>
             <button onClick={resetFlow} className="px-6 py-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors text-sm font-semibold">
