@@ -115,6 +115,7 @@ export interface TranslationSettings {
   customBoxThreshold: number;
   maskDilationOffset: number;
   inpainter: string;
+  skipOutsideBubble: boolean;
 }
 
 export interface FinishedImage {

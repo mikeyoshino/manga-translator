@@ -106,6 +106,8 @@ const t = {
     hintMaskDilation: "ขยายมาสก์ลบข้อความ ค่าสูงจะลบพื้นที่รอบข้อความมากขึ้น",
     hintInpainter: "โมเดลที่ใช้ลบข้อความต้นฉบับออกจากภาพ",
     hintInpaintingSize: "ความละเอียดที่ใช้ในการลบข้อความ",
+    skipOutsideBubble: "ข้ามข้อความนอกบับเบิ้ล",
+    hintSkipOutsideBubble: "ข้ามการลบและแปลข้อความที่อยู่นอกกรอบคำพูด เช่น เสียงเอฟเฟกต์ที่ซ้อนบนภาพ",
   },
   en: {
     back: "Back",
@@ -158,6 +160,8 @@ const t = {
     hintMaskDilation: "Mask dilation around text — higher removes more surrounding area",
     hintInpainter: "Model used to remove original text from the image",
     hintInpaintingSize: "Resolution used for text removal inpainting",
+    skipOutsideBubble: "Skip Outside-Bubble Text",
+    hintSkipOutsideBubble: "Skip removing and translating text outside speech bubbles (e.g. sound effects on artwork)",
   },
 } as const;
 
@@ -219,6 +223,7 @@ function ProjectContent() {
   const [customBoxThreshold, setCustomBoxThreshold] = useState<number>(savedSettings.customBoxThreshold ?? 0.7);
   const [maskDilationOffset, setMaskDilationOffset] = useState<number>(savedSettings.maskDilationOffset ?? 30);
   const [inpainter, setInpainter] = useState(savedSettings.inpainter || "default");
+  const [skipOutsideBubble, setSkipOutsideBubble] = useState(savedSettings.skipOutsideBubble ?? false);
 
   const isProcessing = useMemo(() => {
     if (fileStatuses.size === 0) return false;
@@ -230,10 +235,10 @@ function ProjectContent() {
     const settings: TranslationSettings = {
       detectionResolution, textDetector, renderTextDirection, translator,
       targetLanguage, inpaintingSize, customUnclipRatio, customBoxThreshold,
-      maskDilationOffset, inpainter,
+      maskDilationOffset, inpainter, skipOutsideBubble,
     };
     saveSettings(settings);
-  }, [detectionResolution, textDetector, renderTextDirection, targetLanguage, inpaintingSize, customUnclipRatio, customBoxThreshold, maskDilationOffset, inpainter]);
+  }, [detectionResolution, textDetector, renderTextDirection, targetLanguage, inpaintingSize, customUnclipRatio, customBoxThreshold, maskDilationOffset, inpainter, skipOutsideBubble]);
 
   // Clipboard paste
   useEffect(() => {
@@ -346,6 +351,7 @@ function ProjectContent() {
     render: { direction: renderTextDirection },
     translator: { translator, target_lang: targetLanguage },
     inpainter: { inpainter, inpainting_size: inpaintingSize },
+    ocr: { ignore_bubble: skipOutsideBubble ? 10 : 0 },
     mask_dilation_offset: maskDilationOffset,
   });
 
@@ -657,6 +663,11 @@ function ProjectContent() {
                   {inpaintingSizes.map((s) => <option key={s} value={String(s)}>{s}px</option>)}
                 </select>
               </div>
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input type="checkbox" checked={skipOutsideBubble} onChange={(e) => setSkipOutsideBubble(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-500 focus:ring-indigo-400" />
+                <span className="text-xs font-semibold text-slate-600">{i.skipOutsideBubble}<InfoTooltip text={i.hintSkipOutsideBubble} /></span>
+              </label>
             </div>
             {/* Footer */}
             <div className="pt-4 border-t border-slate-100 space-y-3">
@@ -668,7 +679,7 @@ function ProjectContent() {
                 onClick={() => {
                   setDetectionResolution("1536"); setTextDetector("default"); setRenderTextDirection("auto");
                   setTargetLanguage("THA"); setInpaintingSize("2048"); setCustomUnclipRatio(2.3);
-                  setCustomBoxThreshold(0.7); setMaskDilationOffset(30); setInpainter("default");
+                  setCustomBoxThreshold(0.7); setMaskDilationOffset(30); setInpainter("default"); setSkipOutsideBubble(false);
                 }}
                 className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
               >
