@@ -508,6 +508,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
           inpainter: savedSettings.inpainter || "default",
           inpainting_size: savedSettings.inpaintingSize || "2048",
         },
+        ocr: { ignore_bubble: savedSettings.skipOutsideBubble ? 10 : 0 },
         mask_dilation_offset: savedSettings.maskDilationOffset ?? 30,
       });
 
