@@ -143,10 +143,10 @@ async def _runpod_get_ctx(req: Request, config: Config, image: str | bytes):
     return result
 
 
-async def while_streaming(req: Request, transform, config: Config, image: bytes | str):
+async def while_streaming(req: Request, transform, config: Config, image: bytes | str, on_error=None):
     """Enqueue job and stream progress frames back to the client."""
     if WORKER_MODE == "runpod":
-        return await _runpod_while_streaming(req, transform, config, image)
+        return await _runpod_while_streaming(req, transform, config, image, on_error=on_error)
 
     from server.redis_client import subscribe_progress
 
@@ -158,29 +158,36 @@ async def while_streaming(req: Request, transform, config: Config, image: bytes 
     sentry_sdk.set_tag("task_id", task_id)
 
     async def _generate():
-        async for frame in subscribe_progress(task_id):
-            code = frame[0]
-            payload = frame[5:]
+        try:
+            async for frame in subscribe_progress(task_id):
+                code = frame[0]
+                payload = frame[5:]
 
-            if code == 0:
-                # Result frame — transform the pickled Context
-                ctx = pickle.loads(payload)
-                result_bytes = transform(ctx)
-                out = b'\x00' + len(result_bytes).to_bytes(4, 'big') + result_bytes
-                yield out
-                break
-            elif code == 2:
-                # Error frame — forward as-is
-                yield frame
-                break
-            else:
-                # Progress / queue position / waiting — forward as-is
-                yield frame
+                if code == 0:
+                    # Result frame — transform the pickled Context
+                    ctx = pickle.loads(payload)
+                    result_bytes = transform(ctx)
+                    out = b'\x00' + len(result_bytes).to_bytes(4, 'big') + result_bytes
+                    yield out
+                    break
+                elif code == 2:
+                    # Error frame — trigger refund callback, then forward
+                    if on_error:
+                        on_error(payload.decode("utf-8", errors="replace"))
+                    yield frame
+                    break
+                else:
+                    # Progress / queue position / waiting — forward as-is
+                    yield frame
+        except Exception as e:
+            if on_error:
+                on_error(str(e))
+            raise
 
     return StreamingResponse(_generate(), media_type="application/octet-stream")
 
 
-async def _runpod_while_streaming(req: Request, transform, config: Config, image: bytes | str):
+async def _runpod_while_streaming(req: Request, transform, config: Config, image: bytes | str, on_error=None):
     """
     RunPod mode streaming: emit a "processing" progress frame,
     poll RunPod for the result, then emit the result frame.
@@ -196,6 +203,8 @@ async def _runpod_while_streaming(req: Request, transform, config: Config, image
             result = await _runpod_translate(image_bytes, config)
 
             if "error" in result:
+                if on_error:
+                    on_error(result["error"])
                 error_msg = result["error"].encode("utf-8")
                 yield b'\x02' + len(error_msg).to_bytes(4, 'big') + error_msg
                 return
@@ -207,6 +216,8 @@ async def _runpod_while_streaming(req: Request, transform, config: Config, image
             yield b'\x00' + len(result_bytes).to_bytes(4, 'big') + result_bytes
 
         except Exception as e:
+            if on_error:
+                on_error(str(e))
             error_msg = f"RunPod error: {e}".encode("utf-8")
             yield b'\x02' + len(error_msg).to_bytes(4, 'big') + error_msg
 

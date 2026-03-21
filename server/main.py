@@ -26,9 +26,11 @@ from server.instance import worker_registry
 from server.request_extraction import get_ctx, while_streaming, TranslateRequest, BatchTranslateRequest, get_batch_ctx
 from server.to_json import to_translation, TranslationResponse
 from server.auth import AuthUser, get_current_user, AuthCookieMiddleware, create_session, signout_session, get_me
+import sentry_sdk
 import server.supabase_client as sb
 import server.payment as payment_svc
 import server.projects as projects
+from server.token_guard import deduct_or_raise
 from server.admin import admin_router
 
 app = FastAPI()
@@ -200,75 +202,90 @@ async def stream_image(req: Request, data: TranslateRequest) -> StreamingRespons
 
 @app.post("/translate/with-form/json", response_model=TranslationResponse, tags=["api", "form"])
 async def json_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)):
-    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="translate/json", channel="api"):
-        raise HTTPException(status_code=402, detail="Insufficient tokens")
+    charge = deduct_or_raise(user.id, TOKEN_COST_PER_IMAGE, "translate/json", user.is_admin)
     img = await image.read()
     conf = Config.parse_raw(config)
-    ctx = await get_ctx(req, conf, img)
-    return _ctx_to_response(ctx)
+    try:
+        ctx = await get_ctx(req, conf, img)
+        return _ctx_to_response(ctx)
+    except Exception as e:
+        if charge:
+            charge.refund(reason=str(e))
+        sentry_sdk.capture_exception(e)
+        raise
 
 @app.post("/translate/with-form/bytes", response_class=StreamingResponse, tags=["api", "form"])
 async def bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)):
-    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="translate/bytes", channel="api"):
-        raise HTTPException(status_code=402, detail="Insufficient tokens")
+    charge = deduct_or_raise(user.id, TOKEN_COST_PER_IMAGE, "translate/bytes", user.is_admin)
     img = await image.read()
     conf = Config.parse_raw(config)
-    ctx = await get_ctx(req, conf, img)
-    return StreamingResponse(content=_ctx_to_response(ctx).to_bytes())
+    try:
+        ctx = await get_ctx(req, conf, img)
+        return StreamingResponse(content=_ctx_to_response(ctx).to_bytes())
+    except Exception as e:
+        if charge:
+            charge.refund(reason=str(e))
+        sentry_sdk.capture_exception(e)
+        raise
 
 @app.post("/translate/with-form/image", response_class=StreamingResponse, tags=["api", "form"])
 async def image_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)) -> StreamingResponse:
-    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="translate/image", channel="api"):
-        raise HTTPException(status_code=402, detail="Insufficient tokens")
+    charge = deduct_or_raise(user.id, TOKEN_COST_PER_IMAGE, "translate/image", user.is_admin)
     img = await image.read()
     conf = Config.parse_raw(config)
-    ctx = await get_ctx(req, conf, img)
-    if isinstance(ctx, dict):
-        resp = TranslationResponse.model_validate(ctx)
-        if resp.rendered_image:
-            import base64 as b64mod
-            img_data = b64mod.b64decode(resp.rendered_image.split(",", 1)[1])
-            return StreamingResponse(io.BytesIO(img_data), media_type="image/png")
-        raise HTTPException(500, detail="No rendered image in RunPod response")
-    img_byte_arr = io.BytesIO()
-    ctx.result.save(img_byte_arr, format="PNG")
-    img_byte_arr.seek(0)
-    return StreamingResponse(img_byte_arr, media_type="image/png")
+    try:
+        ctx = await get_ctx(req, conf, img)
+        if isinstance(ctx, dict):
+            resp = TranslationResponse.model_validate(ctx)
+            if resp.rendered_image:
+                import base64 as b64mod
+                img_data = b64mod.b64decode(resp.rendered_image.split(",", 1)[1])
+                return StreamingResponse(io.BytesIO(img_data), media_type="image/png")
+            raise HTTPException(500, detail="No rendered image in RunPod response")
+        img_byte_arr = io.BytesIO()
+        ctx.result.save(img_byte_arr, format="PNG")
+        img_byte_arr.seek(0)
+        return StreamingResponse(img_byte_arr, media_type="image/png")
+    except Exception as e:
+        if charge:
+            charge.refund(reason=str(e))
+        sentry_sdk.capture_exception(e)
+        raise
 
 @app.post("/translate/with-form/json/stream", response_class=StreamingResponse, tags=["api", "form"])
 async def stream_json_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)) -> StreamingResponse:
-    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="translate/json/stream", channel="api"):
-        raise HTTPException(status_code=402, detail="Insufficient tokens")
+    charge = deduct_or_raise(user.id, TOKEN_COST_PER_IMAGE, "translate/json/stream", user.is_admin)
     img = await image.read()
     conf = Config.parse_raw(config)
     conf._is_web_frontend = True
-    return await while_streaming(req, transform_to_json, conf, img)
+    return await while_streaming(req, transform_to_json, conf, img,
+                                 on_error=charge.refund if charge else None)
 
 @app.post("/translate/with-form/bytes/stream", response_class=StreamingResponse, tags=["api", "form"])
 async def stream_bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)) -> StreamingResponse:
-    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="translate/bytes/stream", channel="api"):
-        raise HTTPException(status_code=402, detail="Insufficient tokens")
+    charge = deduct_or_raise(user.id, TOKEN_COST_PER_IMAGE, "translate/bytes/stream", user.is_admin)
     img = await image.read()
     conf = Config.parse_raw(config)
-    return await while_streaming(req, transform_to_bytes, conf, img)
+    return await while_streaming(req, transform_to_bytes, conf, img,
+                                 on_error=charge.refund if charge else None)
 
 @app.post("/translate/with-form/image/stream", response_class=StreamingResponse, tags=["api", "form"])
 async def stream_image_form(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)) -> StreamingResponse:
-    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="translate/image/stream", channel="api"):
-        raise HTTPException(status_code=402, detail="Insufficient tokens")
+    charge = deduct_or_raise(user.id, TOKEN_COST_PER_IMAGE, "translate/image/stream", user.is_admin)
     img = await image.read()
     conf = Config.parse_raw(config)
     conf._web_frontend_optimized = False
-    return await while_streaming(req, transform_to_image, conf, img)
+    return await while_streaming(req, transform_to_image, conf, img,
+                                 on_error=charge.refund if charge else None)
 
 @app.post("/translate/with-form/image/stream/web", response_class=StreamingResponse, tags=["api", "form"])
 async def stream_image_form_web(req: Request, image: UploadFile = File(...), config: str = Form("{}"), user: AuthUser = Depends(get_current_user)) -> StreamingResponse:
-    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="translate/image/stream/web", channel="api"):
-        raise HTTPException(status_code=402, detail="Insufficient tokens")
+    charge = deduct_or_raise(user.id, TOKEN_COST_PER_IMAGE, "translate/image/stream/web", user.is_admin)
     img = await image.read()
     conf = Config.parse_raw(config)
     conf._web_frontend_optimized = True
-    return await while_streaming(req, transform_to_image, conf, img)
+    return await while_streaming(req, transform_to_image, conf, img,
+                                 on_error=charge.refund if charge else None)
 
 @app.post("/inpaint", response_class=StreamingResponse, tags=["api", "form"])
 async def inpaint(
@@ -278,12 +295,10 @@ async def inpaint(
     user: AuthUser = Depends(get_current_user),
 ) -> StreamingResponse:
     """Run AI inpainting: route to RunPod GPU worker."""
-    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference="inpaint", channel="api"):
-        raise HTTPException(status_code=402, detail="Insufficient tokens")
+    charge = deduct_or_raise(user.id, TOKEN_COST_PER_IMAGE, "inpaint", user.is_admin)
 
     import base64
     import logging
-    import sentry_sdk
     from server.runpod_adapter import submit_inpaint_job, poll_job
 
     logger = logging.getLogger(__name__)
@@ -301,6 +316,8 @@ async def inpaint(
         job_id = await submit_inpaint_job(image_b64, mask_b64, inpainting_size)
         result = await poll_job(job_id)
     except Exception as e:
+        if charge:
+            charge.refund(reason=str(e))
         logger.error("Inpaint failed: %s", e, exc_info=True)
         sentry_sdk.capture_exception(e)
         raise HTTPException(status_code=500, detail=f"Inpainting failed: {e}")
@@ -644,8 +661,7 @@ async def translate_project_image(
     config: str = Form("{}"),
     user: AuthUser = Depends(get_current_user),
 ):
-    if not user.is_admin and not sb.deduct_tokens(user.id, TOKEN_COST_PER_IMAGE, reference=f"project/{project_id}", channel="api"):
-        raise HTTPException(status_code=402, detail="Insufficient tokens")
+    charge = deduct_or_raise(user.id, TOKEN_COST_PER_IMAGE, f"project/{project_id}", user.is_admin)
 
     img_row = projects.get_image(image_id)
     if not img_row:
@@ -678,7 +694,8 @@ async def translate_project_image(
             "Manga context extraction failed (non-fatal): %s\n%s", e, traceback.format_exc()
         )
 
-    return await while_streaming(req, transform_to_json, conf, img_bytes)
+    return await while_streaming(req, transform_to_json, conf, img_bytes,
+                                 on_error=charge.refund if charge else None)
 
 @app.post("/projects/{project_id}/images/{image_id}/save-result", tags=["projects"])
 async def save_project_image_result(
