@@ -16,6 +16,9 @@ interface InlineEdit {
   fontFamily: string;
   color: string;
   align: string;
+  lineSpacing: number;
+  bold: boolean;
+  italic: boolean;
 }
 
 export function EditorCanvas() {
@@ -407,6 +410,9 @@ export function EditorCanvas() {
         fontFamily: block.editedFontFamily,
         color: block.editedColor,
         align: block.editedAlignment,
+        lineSpacing: block.editedLineSpacing,
+        bold: block.editedBold,
+        italic: block.editedItalic,
       });
     },
     [currentImage, scale, position]
@@ -647,17 +653,20 @@ export function EditorCanvas() {
             height: inlineEdit.height,
             fontSize: inlineEdit.fontSize,
             fontFamily: inlineEdit.fontFamily,
+            fontWeight: inlineEdit.bold ? "bold" : "normal",
+            fontStyle: inlineEdit.italic ? "italic" : "normal",
             color: inlineEdit.color,
             textAlign: inlineEdit.align as any,
             background: "rgba(0,0,0,0.15)",
             border: "2px solid #3b82f6",
             borderRadius: 4,
-            padding: 4,
+            boxSizing: "border-box",
+            padding: 0,
             resize: "both",
-            overflow: "auto",
+            overflow: "hidden",
             zIndex: 50,
             outline: "none",
-            lineHeight: 1.2,
+            lineHeight: inlineEdit.lineSpacing,
           }}
         />
       )}
