@@ -386,24 +386,6 @@ export default function LandingPage() {
             background-size: 24px 24px;
             opacity: 0.3;
           }
-
-          .speech-bubble-clean {
-            position: relative;
-            background: white;
-            border-radius: 9999px;
-            padding: 1.5rem;
-            text-align: center;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-          }
-          .speech-bubble-clean::after {
-            content: '';
-            position: absolute;
-            bottom: -10px;
-            left: 20%;
-            border-width: 15px 15px 0 0;
-            border-style: solid;
-            border-color: white transparent transparent transparent;
-          }
         `}
       </style>
 
@@ -495,66 +477,31 @@ export default function LandingPage() {
           {/* Visual: Before/After Slider */}
           <div className="relative p-2">
             <div
-              className="relative aspect-[4/5] sm:aspect-square rounded-3xl overflow-hidden shadow-2xl shadow-slate-200 border border-slate-100 cursor-ew-resize bg-slate-100 select-none group"
+              className="relative aspect-[800/819] rounded-3xl overflow-hidden shadow-2xl shadow-slate-200 border border-slate-100 cursor-ew-resize bg-slate-100 select-none group"
               onMouseMove={handleMouseMove}
               onTouchMove={handleTouchMove}
             >
               {/* Base Image (BEFORE) */}
-              <div
-                className="absolute inset-0 w-full h-full bg-cover bg-center"
-                style={{
-                  backgroundImage:
-                    "url('https://images.unsplash.com/photo-1613376023733-7a32d163fbdb?q=80&w=1000&auto=format&fit=crop')",
-                }}
-              >
-                {/* JP Text Bubble */}
-                <div className="absolute top-[20%] right-[15%] w-28 h-28 speech-bubble-clean flex items-center justify-center">
-                  <div className="flex flex-col items-center gap-0 leading-none">
-                    <span
-                      className="text-2xl font-bold text-slate-900"
-                      style={{ fontFamily: "serif" }}
-                    >
-                      何
-                    </span>
-                    <span
-                      className="text-2xl font-bold text-slate-900"
-                      style={{ fontFamily: "serif" }}
-                    >
-                      だ
-                    </span>
-                    <span
-                      className="text-2xl font-bold text-slate-900"
-                      style={{ fontFamily: "serif" }}
-                    >
-                      と
-                    </span>
-                    <span
-                      className="text-2xl font-bold text-slate-900"
-                      style={{ fontFamily: "serif" }}
-                    >
-                      !?
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <img
+                src="/images/before.webp"
+                alt="Original manga page"
+                className="absolute inset-0 w-full h-full object-cover"
+                draggable={false}
+              />
 
               {/* Top Image (AFTER) */}
               <div
-                className="absolute inset-0 h-full bg-cover bg-center"
+                className="absolute inset-0 h-full overflow-hidden"
                 style={{
                   clipPath: `polygon(0 0, ${sliderPosition}% 0, ${sliderPosition}% 100%, 0 100%)`,
-                  backgroundImage:
-                    "url('https://images.unsplash.com/photo-1613376023733-7a32d163fbdb?q=80&w=1000&auto=format&fit=crop')",
                 }}
               >
-                {/* Translated Text Bubble */}
-                <div className="absolute top-[20%] right-[15%] w-28 h-28 speech-bubble-clean flex items-center justify-center">
-                  <div className="text-center w-full">
-                    <span className="text-lg font-bold text-slate-800 leading-tight block">
-                      {lang === "th" ? "ว่าไงนะ!?" : "What did\nyou say!?"}
-                    </span>
-                  </div>
-                </div>
+                <img
+                  src="/images/after.webp"
+                  alt="Translated manga page"
+                  className="w-full h-full object-cover"
+                  draggable={false}
+                />
               </div>
 
               {/* Slider Line & Handle */}

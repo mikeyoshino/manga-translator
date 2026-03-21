@@ -453,8 +453,40 @@ export function EditorCanvas() {
         onTouchEnd={handleMouseUp}
         className="konva-stage"
       >
+        {/* Background + drawing layer (pen strokes behind text) */}
         <Layer>
           {bgImage && <KonvaImage image={bgImage} />}
+          {existingLines.map((line, idx) => (
+            <Line
+              key={`draw-${idx}`}
+              points={line.points}
+              stroke={line.tool === "eraser" ? "#000000" : line.color}
+              strokeWidth={line.size}
+              lineCap="round"
+              lineJoin="round"
+              tension={0.5}
+              globalCompositeOperation={
+                line.tool === "eraser" ? "destination-out" : "source-over"
+              }
+            />
+          ))}
+          {currentLine && activeTool !== "magicRemover" && (
+            <Line
+              points={currentLine.points}
+              stroke={currentLine.tool === "eraser" ? "#000000" : currentLine.color}
+              strokeWidth={currentLine.size}
+              lineCap="round"
+              lineJoin="round"
+              tension={0.5}
+              globalCompositeOperation={
+                currentLine.tool === "eraser" ? "destination-out" : "source-over"
+              }
+            />
+          )}
+        </Layer>
+
+        {/* Text blocks layer — on top of pen strokes */}
+        <Layer>
           {currentImage.editableBlocks.map((block) => (
             <BlockOverlay
               key={block.id}
@@ -484,36 +516,6 @@ export function EditorCanvas() {
           ))}
         </Layer>
 
-        {/* Drawing layer — on top of blocks */}
-        <Layer>
-          {existingLines.map((line, idx) => (
-            <Line
-              key={idx}
-              points={line.points}
-              stroke={line.tool === "eraser" ? "#000000" : line.color}
-              strokeWidth={line.size}
-              lineCap="round"
-              lineJoin="round"
-              tension={0.5}
-              globalCompositeOperation={
-                line.tool === "eraser" ? "destination-out" : "source-over"
-              }
-            />
-          ))}
-          {currentLine && activeTool !== "magicRemover" && (
-            <Line
-              points={currentLine.points}
-              stroke={currentLine.tool === "eraser" ? "#000000" : currentLine.color}
-              strokeWidth={currentLine.size}
-              lineCap="round"
-              lineJoin="round"
-              tension={0.5}
-              globalCompositeOperation={
-                currentLine.tool === "eraser" ? "destination-out" : "source-over"
-              }
-            />
-          )}
-        </Layer>
 
         {/* Magic remover overlay layer — semi-transparent magenta */}
         <Layer>

@@ -30,18 +30,32 @@ export function EditorToolbar() {
     setCurrentImageIndex((i) => Math.min(images.length - 1, i + 1));
   };
 
+  const getCompositeCanvas = useCallback((): HTMLCanvasElement | null => {
+    const stageContainer = document.querySelector(".konva-stage");
+    if (!stageContainer) return null;
+    const layerCanvases = stageContainer.querySelectorAll("canvas");
+    if (layerCanvases.length === 0) return null;
+
+    const first = layerCanvases[0];
+    const composite = document.createElement("canvas");
+    composite.width = first.width;
+    composite.height = first.height;
+    const ctx = composite.getContext("2d")!;
+    layerCanvases.forEach((c) => ctx.drawImage(c, 0, 0));
+    return composite;
+  }, []);
+
   const handleExportCurrent = useCallback(() => {
-    const stageEl = document.querySelector(".konva-stage canvas") as HTMLCanvasElement | null;
-    if (stageEl && currentImage) {
-      exportSingleImage(stageEl, currentImage.originalFilename);
+    const canvas = getCompositeCanvas();
+    if (canvas && currentImage) {
+      exportSingleImage(canvas, currentImage.originalFilename);
     }
-  }, [currentImage]);
+  }, [currentImage, getCompositeCanvas]);
 
   const handleExportAll = useCallback(() => {
-    const getter = (_imageId: string) =>
-      document.querySelector(".konva-stage canvas") as HTMLCanvasElement | null;
+    const getter = (_imageId: string) => getCompositeCanvas();
     exportAllAsZip(getter, images);
-  }, [images]);
+  }, [images, getCompositeCanvas]);
 
   const handleToolClick = (tool: "pen" | "eraser" | "magicRemover" | "manualTranslate" | "cloneStamp") => {
     setActiveTool(activeTool === tool ? "select" : tool);
