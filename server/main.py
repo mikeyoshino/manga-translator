@@ -31,6 +31,7 @@ import server.supabase_client as sb
 import server.payment as payment_svc
 import server.projects as projects
 from server.token_guard import deduct_or_raise
+from server.admin import admin_router
 
 app = FastAPI()
 app.add_middleware(AuthCookieMiddleware)
@@ -40,7 +41,7 @@ BASE_DIR = Path(__file__).resolve().parent
 RESULT_ROOT = (BASE_DIR.parent / "result").resolve()
 RESULT_ROOT.mkdir(parents=True, exist_ok=True)
 
-ALLOWED_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+ALLOWED_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:3000").split(",")
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,6 +50,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(admin_router)
 
 TOKEN_COST_PER_IMAGE = int(os.getenv("TOKEN_COST_PER_IMAGE", "1"))
 
