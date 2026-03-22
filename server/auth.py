@@ -21,6 +21,7 @@ ADMIN_EMAILS = {e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split("
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() in ("true", "1", "yes")
 COOKIE_SAMESITE = "lax"
 COOKIE_PATH = "/"
+COOKIE_DOMAIN = os.getenv("COOKIE_DOMAIN", "")  # e.g. ".wunplae.com" for cross-subdomain
 ACCESS_TOKEN_MAX_AGE = 3600       # 1 hour
 REFRESH_TOKEN_MAX_AGE = 604800    # 7 days
 
@@ -44,6 +45,7 @@ class AuthUser(BaseModel):
 
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str):
     """Set httpOnly auth cookies on a response."""
+    domain_kwargs = {"domain": COOKIE_DOMAIN} if COOKIE_DOMAIN else {}
     response.set_cookie(
         key="sb-access-token",
         value=access_token,
@@ -52,6 +54,7 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         samesite=COOKIE_SAMESITE,
         path=COOKIE_PATH,
         max_age=ACCESS_TOKEN_MAX_AGE,
+        **domain_kwargs,
     )
     response.set_cookie(
         key="sb-refresh-token",
@@ -61,13 +64,15 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         samesite=COOKIE_SAMESITE,
         path=COOKIE_PATH,
         max_age=REFRESH_TOKEN_MAX_AGE,
+        **domain_kwargs,
     )
 
 
 def _clear_auth_cookies(response: Response):
     """Clear auth cookies from a response."""
-    response.delete_cookie(key="sb-access-token", path=COOKIE_PATH)
-    response.delete_cookie(key="sb-refresh-token", path=COOKIE_PATH)
+    domain_kwargs = {"domain": COOKIE_DOMAIN} if COOKIE_DOMAIN else {}
+    response.delete_cookie(key="sb-access-token", path=COOKIE_PATH, **domain_kwargs)
+    response.delete_cookie(key="sb-refresh-token", path=COOKIE_PATH, **domain_kwargs)
 
 
 def _verify_token(token: str):

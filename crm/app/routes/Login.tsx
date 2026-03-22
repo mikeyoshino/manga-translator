@@ -33,7 +33,7 @@ export default function Login() {
           refresh_token: data.session.refresh_token,
         }),
       });
-      window.location.href = "/crm/dashboard";
+      window.location.href = "/dashboard";
     } catch (err) {
       setError(String(err));
     } finally {
