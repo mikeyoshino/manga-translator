@@ -2,16 +2,18 @@ import { Disclosure } from "@headlessui/react";
 import React from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router";
+import { useSecureUrl } from "@/context/LocaleContext";
 
 type Props = {};
 
 export const Header: React.FC<Props> = () => {
   const { user, tokenBalance, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
+  const secureUrl = useSecureUrl();
 
   const handleSignOut = async () => {
     await signOut();
-    navigate("/login");
+    window.location.href = secureUrl("/login");
   };
 
   return (

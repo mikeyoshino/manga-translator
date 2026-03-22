@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/landing";
-import { useLocale, useLocalePath, useT } from "@/context/LocaleContext";
+import { useLocale, useLocalePath, useSecureUrl, useT } from "@/context/LocaleContext";
 import type { Locale } from "@/context/LocaleContext";
 import { getMessages } from "@/i18n";
 import {
@@ -82,6 +82,7 @@ const featureIcons: LucideIcon[] = [
 export default function LandingPage() {
   const lang = useLocale();
   const lp = useLocalePath();
+  const loginUrl = useSecureUrl();
   const otherLocale = lang === "th" ? "en" : "th";
   const [sliderPosition, setSliderPosition] = useState(50);
   const t = useT().landing;
@@ -151,18 +152,18 @@ export default function LandingPage() {
                 <Languages className="w-4 h-4" />
                 {t.nav.lang}
               </Link>
-              <Link
-                to={lp("/login")}
+              <a
+                href={loginUrl("/login")}
                 className="hidden sm:block text-slate-600 font-medium hover:text-indigo-600 transition-colors"
               >
                 {t.nav.login}
-              </Link>
-              <Link
-                to={lp("/login")}
+              </a>
+              <a
+                href={loginUrl("/login")}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium shadow-sm shadow-indigo-200 transition-all hover:-translate-y-0.5"
               >
                 {t.nav.startFree}
-              </Link>
+              </a>
             </div>
           </div>
         </div>
@@ -187,12 +188,12 @@ export default function LandingPage() {
               {t.hero.subhead}
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link
-                to={lp("/login")}
+              <a
+                href={loginUrl("/login")}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-semibold text-lg shadow-lg shadow-indigo-200 transition-all hover:-translate-y-1 flex justify-center items-center gap-2"
               >
                 {t.hero.cta} <ArrowRight className="w-5 h-5" />
-              </Link>
+              </a>
             </div>
             <p className="text-sm text-slate-500 font-medium mt-4 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -207,15 +208,15 @@ export default function LandingPage() {
               onMouseMove={handleMouseMove}
               onTouchMove={handleTouchMove}
             >
-              {/* Base Image (BEFORE) */}
+              {/* Base Image (AFTER — translated) */}
               <img
-                src="/images/before.webp"
-                alt="Original manga page"
+                src={`/images/after-${lang}.webp`}
+                alt="Translated manga page"
                 className="absolute inset-0 w-full h-full object-cover"
                 draggable={false}
               />
 
-              {/* Top Image (AFTER) */}
+              {/* Top Image (BEFORE — original Japanese) */}
               <div
                 className="absolute inset-0 h-full overflow-hidden"
                 style={{
@@ -223,8 +224,8 @@ export default function LandingPage() {
                 }}
               >
                 <img
-                  src={`/images/after-${lang}.webp`}
-                  alt="Translated manga page"
+                  src="/images/before.webp"
+                  alt="Original manga page"
                   className="w-full h-full object-cover"
                   draggable={false}
                 />
@@ -432,8 +433,8 @@ export default function LandingPage() {
                     / {tier.tokens}
                   </span>
                 </div>
-                <Link
-                  to={lp("/login")}
+                <a
+                  href={loginUrl("/login")}
                   className={`block w-full py-3.5 rounded-xl font-semibold text-center transition-all ${
                     tier.popular
                       ? "bg-white text-indigo-600 hover:bg-slate-50 shadow-sm"
@@ -441,7 +442,7 @@ export default function LandingPage() {
                   }`}
                 >
                   {t.pricing.choosePlan}
-                </Link>
+                </a>
               </div>
             ))}
           </div>
@@ -476,12 +477,12 @@ export default function LandingPage() {
             <h2 className="text-3xl sm:text-4xl font-bold mb-8 relative z-10">
               {t.footer.cta}
             </h2>
-            <Link
-              to={lp("/login")}
+            <a
+              href={loginUrl("/login")}
               className="inline-block bg-white text-indigo-600 px-10 py-4 rounded-2xl font-semibold text-lg hover:bg-slate-50 shadow-sm transition-transform hover:-translate-y-1 relative z-10"
             >
               {t.footer.btn}
-            </Link>
+            </a>
           </div>
 
           <div className="mt-16 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-500">

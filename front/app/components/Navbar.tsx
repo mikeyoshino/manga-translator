@@ -12,7 +12,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useLocale, useLocalePath, useT } from "@/context/LocaleContext";
+import { useLocale, useLocalePath, useSecureUrl, useT } from "@/context/LocaleContext";
 
 
 interface NavbarProps {
@@ -42,9 +42,10 @@ export function Navbar({ showBack = false, showLanguageToggle = false }: NavbarP
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const secureUrl = useSecureUrl();
   const handleSignOut = async () => {
     await signOut();
-    navigate(lp("/login"));
+    window.location.href = secureUrl("/login");
   };
 
   // Build the "other locale" version of the current path
