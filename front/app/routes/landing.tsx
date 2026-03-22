@@ -208,15 +208,15 @@ export default function LandingPage() {
               onMouseMove={handleMouseMove}
               onTouchMove={handleTouchMove}
             >
-              {/* Base Image (BEFORE) */}
+              {/* Base Image (AFTER — translated) */}
               <img
-                src="/images/before.webp"
-                alt="Original manga page"
+                src={`/images/after-${lang}.webp`}
+                alt="Translated manga page"
                 className="absolute inset-0 w-full h-full object-cover"
                 draggable={false}
               />
 
-              {/* Top Image (AFTER) */}
+              {/* Top Image (BEFORE — original Japanese) */}
               <div
                 className="absolute inset-0 h-full overflow-hidden"
                 style={{
@@ -224,8 +224,8 @@ export default function LandingPage() {
                 }}
               >
                 <img
-                  src={`/images/after-${lang}.webp`}
-                  alt="Translated manga page"
+                  src="/images/before.webp"
+                  alt="Original manga page"
                   className="w-full h-full object-cover"
                   draggable={false}
                 />
