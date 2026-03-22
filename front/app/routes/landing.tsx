@@ -116,7 +116,7 @@ export default function LandingPage() {
 
   return (
     <div
-      className="min-h-screen bg-[#fafbfc] font-[Kanit] text-slate-800 relative overflow-hidden"
+      className="min-h-screen bg-[#fafbfc] font-sans text-slate-800 relative overflow-hidden"
     >
       <style>
         {`

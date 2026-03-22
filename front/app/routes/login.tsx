@@ -13,10 +13,20 @@ export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [signUpSuccess, setSignUpSuccess] = useState(false);
+
+  const pwRules = isSignUp && password.length > 0 ? {
+    minLength: password.length >= 8,
+    hasLetter: /[A-Za-z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSpecial: /[^A-Za-z0-9]/.test(password),
+    asciiOnly: /^[\x20-\x7E]*$/.test(password),
+  } : null;
+  const pwValid = pwRules ? Object.values(pwRules).every(Boolean) : true;
 
   // Redirect if already logged in
   useEffect(() => {
@@ -38,6 +48,15 @@ export default function LoginPage() {
 
     try {
       if (isSignUp) {
+        if (!pwValid) {
+          setSubmitting(false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError(i.passwordMismatch);
+          setSubmitting(false);
+          return;
+        }
         const { error: err } = await signUp(email, password, displayName || undefined);
         if (err) {
           setError(err.message);
@@ -129,16 +148,49 @@ export default function LoginPage() {
             <input
               type="password"
               required
-              minLength={6}
+              minLength={isSignUp ? 8 : 6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-gray-900"
-              placeholder={i.passwordPlaceholder}
+              placeholder={isSignUp ? i.passwordPlaceholderSignUp : i.passwordPlaceholder}
             />
+            {pwRules && (
+              <ul className="mt-2 space-y-1 text-xs">
+                <li className={pwRules.minLength ? "text-emerald-600" : "text-slate-400"}>
+                  {pwRules.minLength ? "\u2713" : "\u2022"} {i.pwRuleMinLength}
+                </li>
+                <li className={pwRules.hasLetter ? "text-emerald-600" : "text-slate-400"}>
+                  {pwRules.hasLetter ? "\u2713" : "\u2022"} {i.pwRuleLetter}
+                </li>
+                <li className={pwRules.hasNumber ? "text-emerald-600" : "text-slate-400"}>
+                  {pwRules.hasNumber ? "\u2713" : "\u2022"} {i.pwRuleNumber}
+                </li>
+                <li className={pwRules.hasSpecial ? "text-emerald-600" : "text-slate-400"}>
+                  {pwRules.hasSpecial ? "\u2713" : "\u2022"} {i.pwRuleSpecial}
+                </li>
+                <li className={pwRules.asciiOnly ? "text-emerald-600" : "text-red-500"}>
+                  {pwRules.asciiOnly ? "\u2713" : "\u2717"} {i.pwRuleAsciiOnly}
+                </li>
+              </ul>
+            )}
           </div>
+          {isSignUp && (
+            <div>
+              <label className="block text-sm font-semibold text-slate-600 mb-1">{i.confirmPasswordLabel}</label>
+              <input
+                type="password"
+                required
+                minLength={8}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-gray-900"
+                placeholder={i.confirmPasswordPlaceholder}
+              />
+            </div>
+          )}
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || (isSignUp && !pwValid)}
             className="w-full py-2 px-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all font-bold shadow-lg shadow-indigo-200"
           >
             {submitting ? i.submitting : isSignUp ? i.signUp : i.signIn}
@@ -148,7 +200,7 @@ export default function LoginPage() {
         <p className="mt-4 text-center text-sm text-slate-600">
           {isSignUp ? i.alreadyHaveAccount : i.noAccount}{" "}
           <button
-            onClick={() => { setIsSignUp(!isSignUp); setError(null); }}
+            onClick={() => { setIsSignUp(!isSignUp); setError(null); setConfirmPassword(""); }}
             className="text-indigo-600 hover:text-indigo-500 font-medium"
           >
             {isSignUp ? i.signIn : i.signUp}

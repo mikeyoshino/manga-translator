@@ -89,6 +89,7 @@
     "displayNamePlaceholder": "ชื่อของคุณ",
     "emailPlaceholder": "you@example.com",
     "passwordPlaceholder": "อย่างน้อย 6 ตัวอักษร",
+    "passwordPlaceholderSignUp": "อย่างน้อย 8 ตัวอักษร",
     "submitting": "กรุณารอ...",
     "signUp": "สมัครสมาชิก",
     "alreadyHaveAccount": "มีบัญชีแล้ว?",
@@ -96,7 +97,15 @@
     "checkEmail": "ตรวจสอบอีเมลของคุณ",
     "confirmationSent": "เราส่งลิงก์ยืนยันไปที่",
     "verifyEmail": "กรุณายืนยันอีเมลเพื่อเข้าสู่ระบบ",
-    "backToSignIn": "กลับไปเข้าสู่ระบบ"
+    "backToSignIn": "กลับไปเข้าสู่ระบบ",
+    "confirmPasswordLabel": "ยืนยันรหัสผ่าน",
+    "confirmPasswordPlaceholder": "กรอกรหัสผ่านอีกครั้ง",
+    "passwordMismatch": "รหัสผ่านไม่ตรงกัน",
+    "pwRuleMinLength": "อย่างน้อย 8 ตัวอักษร",
+    "pwRuleLetter": "มีตัวอักษรภาษาอังกฤษ (a-z)",
+    "pwRuleNumber": "มีตัวเลข (0-9)",
+    "pwRuleSpecial": "มีอักขระพิเศษ (!@#$% เป็นต้น)",
+    "pwRuleAsciiOnly": "ใช้เฉพาะตัวอักษรภาษาอังกฤษเท่านั้น"
   },
   "navbar": {
     "tokens": "โทเค็น",
