@@ -22,10 +22,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Bootstrap user state from cookie on mount
+  // Bootstrap user state from cookie on mount.
+  // Uses plain fetch (not apiFetch) to avoid firing auth:expired during
+  // the initial bootstrap — the backend may refresh the token silently.
   const bootstrapUser = useCallback(async () => {
     try {
-      const res = await apiFetch("/api/auth/me");
+      const res = await fetch("/api/auth/me", { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setUser({ id: data.id, email: data.email } as User);

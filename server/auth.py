@@ -6,6 +6,8 @@ Supports both Bearer token (for external API clients) and httpOnly cookies
 
 import logging
 import os
+import time
+import threading
 
 from fastapi import Depends, HTTPException, Request, Response
 from pydantic import BaseModel
@@ -13,6 +15,13 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from supabase import create_client
 
 logger = logging.getLogger(__name__)
+
+# Cache refreshed sessions briefly to prevent concurrent requests from
+# each trying to refresh the same (now-revoked) Supabase refresh token.
+# Key: old_refresh_token → Value: (new_session, timestamp)
+_refresh_cache: dict[str, tuple] = {}
+_refresh_lock = threading.Lock()
+_REFRESH_CACHE_TTL = 30  # seconds
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -85,6 +94,41 @@ def _verify_token(token: str):
     return user
 
 
+def _refresh_with_cache(refresh_token: str):
+    """Refresh a Supabase session, caching the result briefly.
+
+    Supabase refresh tokens are single-use: once rotated, the old token is
+    revoked.  If multiple concurrent requests arrive with the same expired
+    access token, only the first should call Supabase; the rest reuse the
+    cached new session.
+    """
+    now = time.monotonic()
+
+    with _refresh_lock:
+        # Evict stale entries
+        stale = [k for k, (_, ts) in _refresh_cache.items() if now - ts > _REFRESH_CACHE_TTL]
+        for k in stale:
+            del _refresh_cache[k]
+
+        # Check cache
+        if refresh_token in _refresh_cache:
+            cached_session, _ = _refresh_cache[refresh_token]
+            return cached_session
+
+    # Not cached — call Supabase (outside lock to avoid blocking)
+    client = _get_auth_client()
+    refreshed = client.auth.refresh_session(refresh_token)
+    if not refreshed or not refreshed.session:
+        raise HTTPException(status_code=401, detail="Token refresh failed")
+
+    new_session = refreshed.session
+
+    with _refresh_lock:
+        _refresh_cache[refresh_token] = (new_session, time.monotonic())
+
+    return new_session
+
+
 async def get_current_user(request: Request) -> AuthUser:
     """Extract and verify auth token from Bearer header or httpOnly cookie.
 
@@ -115,11 +159,7 @@ async def get_current_user(request: Request) -> AuthUser:
         if not refresh_token or auth_header:
             raise
         try:
-            client = _get_auth_client()
-            refreshed = client.auth.refresh_session(refresh_token)
-            if not refreshed or not refreshed.session:
-                raise HTTPException(status_code=401, detail="Token refresh failed")
-            new_session = refreshed.session
+            new_session = _refresh_with_cache(refresh_token)
             user = new_session.user
             if not user:
                 raise HTTPException(status_code=401, detail="Token refresh failed")
