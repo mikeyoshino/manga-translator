@@ -230,6 +230,17 @@ export function pushToHistory(history: ImageHistory, action: EditorAction): Imag
   return { undoStack, redoStack: [] };
 }
 
+// --- Upload tracker types ---
+
+export interface UploadFileTracker {
+  id: string;
+  filename: string;
+  size: number;
+  progress: number;
+  status: "uploading" | "success" | "error";
+  error?: string;
+}
+
 // --- Project types ---
 
 export interface Project {
