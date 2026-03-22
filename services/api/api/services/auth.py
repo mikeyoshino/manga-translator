@@ -24,10 +24,14 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 ADMIN_EMAILS = {e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()}
 
-COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() in ("true", "1", "yes")
 COOKIE_SAMESITE = "lax"
 COOKIE_PATH = "/"
 COOKIE_DOMAIN = os.getenv("COOKIE_DOMAIN", "")
+_cookie_secure_raw = os.getenv("COOKIE_SECURE", "")
+if _cookie_secure_raw:
+    COOKIE_SECURE = _cookie_secure_raw.lower() in ("true", "1", "yes")
+else:
+    COOKIE_SECURE = bool(COOKIE_DOMAIN)  # true in prod (multi-subdomain), false in dev
 ACCESS_TOKEN_MAX_AGE = 3600
 REFRESH_TOKEN_MAX_AGE = 604800
 
@@ -51,6 +55,12 @@ class AuthUser(BaseModel):
 
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str):
     domain_kwargs = {"domain": COOKIE_DOMAIN} if COOKIE_DOMAIN else {}
+    # Clear stale cookies (both domain-less and domain-scoped) to prevent duplicates
+    # that cause auth loops across subdomains
+    for key in ("sb-access-token", "sb-refresh-token"):
+        response.delete_cookie(key=key, path=COOKIE_PATH)  # domain-less
+        if COOKIE_DOMAIN:
+            response.delete_cookie(key=key, path=COOKIE_PATH, domain=COOKIE_DOMAIN)
     response.set_cookie(
         key="sb-access-token", value=access_token, httponly=True,
         secure=COOKIE_SECURE, samesite=COOKIE_SAMESITE, path=COOKIE_PATH,
@@ -64,9 +74,11 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
 
 
 def _clear_auth_cookies(response: Response):
-    domain_kwargs = {"domain": COOKIE_DOMAIN} if COOKIE_DOMAIN else {}
-    response.delete_cookie(key="sb-access-token", path=COOKIE_PATH, **domain_kwargs)
-    response.delete_cookie(key="sb-refresh-token", path=COOKIE_PATH, **domain_kwargs)
+    # Clear both domain-less and domain-scoped cookies to handle stale leftovers
+    for key in ("sb-access-token", "sb-refresh-token"):
+        response.delete_cookie(key=key, path=COOKIE_PATH)  # domain-less
+        if COOKIE_DOMAIN:
+            response.delete_cookie(key=key, path=COOKIE_PATH, domain=COOKIE_DOMAIN)
 
 
 def _verify_token(token: str):
