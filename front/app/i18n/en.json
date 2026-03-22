@@ -187,7 +187,29 @@
     "hintMaskDilation": "Mask dilation around text — higher removes more surrounding area",
     "hintInpaintingSize": "Resolution used for text removal inpainting",
     "skipOutsideBubble": "Skip Outside-Bubble Text",
-    "hintSkipOutsideBubble": "Skip removing and translating text outside speech bubbles (e.g. sound effects on artwork)"
+    "hintSkipOutsideBubble": "Skip removing and translating text outside speech bubbles (e.g. sound effects on artwork)",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "cancelConfirm": "Cancel translation in progress?",
+    "statusLabels": {
+      "uploaded": "Ready",
+      "pending": "Queued",
+      "detection": "Detecting",
+      "ocr": "Reading text",
+      "textline_merge": "Merging",
+      "mask-generation": "Masking",
+      "inpainting": "Inpainting",
+      "translating": "Translating",
+      "rendering": "Rendering",
+      "finished": "Done",
+      "translated": "Translated",
+      "error": "Error"
+    },
+    "uploadTracker": {
+      "title": "Uploading {count} files",
+      "complete": "Upload complete",
+      "failed": "Upload failed"
+    }
   },
   "topup": {
     "topUp": "Top Up Tokens",

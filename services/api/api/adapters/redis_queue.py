@@ -216,7 +216,7 @@ async def _runpod_while_streaming(req: Request, transform, config: Config, image
     image_bytes = _image_to_bytes(image)
 
     async def _generate():
-        progress_msg = b"Processing on GPU..."
+        progress_msg = b"translating"
         yield b'\x01' + len(progress_msg).to_bytes(4, 'big') + progress_msg
 
         try:

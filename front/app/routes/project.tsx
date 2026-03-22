@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useLocale, useLocalePath, useT } from "@/context/LocaleContext";
 import type { Locale } from "@/context/LocaleContext";
@@ -18,6 +18,7 @@ import {
   Info,
   ChevronDown,
   Check,
+  RotateCcw,
 } from "lucide-react";
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from "@headlessui/react";
 import {
@@ -30,6 +31,7 @@ import {
   type TranslationResponseJson,
   type EditorImage,
   type ProjectImage,
+  type UploadFileTracker,
 } from "@/types";
 import {
   imageMimeTypes,
@@ -44,6 +46,7 @@ import { initEditableBlocks } from "@/utils/initEditableBlocks";
 import { useEditor } from "@/context/EditorContext";
 import { useAuth } from "@/context/AuthContext";
 import { AuthGuard } from "@/components/AuthGuard";
+import { UploadTracker } from "@/components/UploadTracker";
 import { apiFetch } from "@/utils/api";
 
 export const clientLoader = async () => null;
@@ -103,7 +106,13 @@ function ProjectContent() {
   const [fileStatuses, setFileStatuses] = useState<Map<string, FileStatus>>(new Map());
   const [localFiles, setLocalFiles] = useState<Map<string, File>>(new Map());
   const [shouldTranslate, setShouldTranslate] = useState(false);
-  const [uploading, setUploading] = useState(false);
+
+  // Upload tracker
+  const [uploadTrackerFiles, setUploadTrackerFiles] = useState<UploadFileTracker[]>([]);
+  const [showUploadTracker, setShowUploadTracker] = useState(false);
+
+  // Cancel support
+  const abortRef = useRef<AbortController | null>(null);
 
   // Translation settings
   const [savedSettings] = useState(() => loadSettings());
@@ -176,25 +185,60 @@ function ProjectContent() {
     }
   }, [fileStatuses]);
 
-  // Upload files to project
+  // Upload files to project (per-file with progress tracking)
   const handleUploadFiles = async (files: File[]) => {
     if (!user || !projectId || files.length === 0) return;
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      files.forEach((f) => formData.append("images", f));
-      const res = await apiFetch(`/api/projects/${projectId}/images`, {
-        method: "POST",
-        body: formData,
-      });
-      if (res.ok) {
-        const newImages: ProjectImage[] = await res.json();
-        setProjectImages((prev) => [...prev, ...newImages]);
+
+    const trackers: UploadFileTracker[] = files.map((f, idx) => ({
+      id: `upload-${Date.now()}-${idx}`,
+      filename: f.name,
+      size: f.size,
+      progress: 0,
+      status: "uploading" as const,
+    }));
+    setUploadTrackerFiles(trackers);
+    setShowUploadTracker(true);
+
+    for (let idx = 0; idx < files.length; idx++) {
+      const file = files[idx];
+      const trackerId = trackers[idx].id;
+      try {
+        const newImage = await new Promise<ProjectImage>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const pct = (e.loaded / e.total) * 100;
+              setUploadTrackerFiles((prev) =>
+                prev.map((t) => t.id === trackerId ? { ...t, progress: pct } : t)
+              );
+            }
+          };
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const result: ProjectImage[] = JSON.parse(xhr.responseText);
+                resolve(result[0]);
+              } catch { reject(new Error("Parse error")); }
+            } else {
+              reject(new Error(`Upload failed: ${xhr.status}`));
+            }
+          };
+          xhr.onerror = () => reject(new Error("Network error"));
+          const formData = new FormData();
+          formData.append("images", file);
+          xhr.open("POST", `/api/projects/${projectId}/images`);
+          xhr.withCredentials = true;
+          xhr.send(formData);
+        });
+        setUploadTrackerFiles((prev) =>
+          prev.map((t) => t.id === trackerId ? { ...t, status: "success", progress: 100 } : t)
+        );
+        setProjectImages((prev) => [...prev, newImage]);
+      } catch (err) {
+        setUploadTrackerFiles((prev) =>
+          prev.map((t) => t.id === trackerId ? { ...t, status: "error", error: err instanceof Error ? err.message : "Error" } : t)
+        );
       }
-    } catch {
-      // silent
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -260,11 +304,19 @@ function ProjectContent() {
 
   const processTranslation = async () => {
     const config = buildTranslationConfig();
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
-      await Promise.all(untranslatedImages.map((pi) => translateProjectImage(pi, config)));
+      for (const pi of untranslatedImages) {
+        if (controller.signal.aborted) break;
+        await translateProjectImage(pi, config, controller.signal);
+      }
     } catch (err) {
-      console.error("Translation process failed:", err);
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        console.error("Translation process failed:", err);
+      }
     } finally {
+      abortRef.current = null;
       refreshBalance();
       // Reload project to get updated image data with signed URLs
       if (user && projectId) {
@@ -277,13 +329,14 @@ function ProjectContent() {
     }
   };
 
-  const translateProjectImage = async (pi: ProjectImage, config: string) => {
+  const translateProjectImage = async (pi: ProjectImage, config: string, signal?: AbortSignal) => {
     try {
       const formData = new FormData();
       formData.append("config", config);
       const response = await apiFetch(`/api/projects/${projectId}/images/${pi.id}/translate`, {
         method: "POST",
         body: formData,
+        signal,
       });
       if (response.status === 402) throw new Error("Insufficient tokens");
       if (response.status === 401) throw new Error("Not authenticated");
@@ -336,6 +389,18 @@ function ProjectContent() {
         }
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        // Cancelled — reset to uploaded
+        updateFileStatus(pi.id, { status: null });
+        try {
+          await apiFetch(`/api/projects/${projectId}/images/${pi.id}/status`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "uploaded" }),
+          });
+        } catch { /* silent */ }
+        throw err; // propagate to break the loop
+      }
       updateFileStatus(pi.id, { status: "error", error: err instanceof Error ? err.message : "Unknown error" });
     }
   };
@@ -370,6 +435,52 @@ function ProjectContent() {
     setEditorImages(editorImages);
     navigate(lp("/studio/editor"));
   };
+
+  const handleCancel = useCallback(async () => {
+    abortRef.current?.abort();
+    // Reset any in-progress images back to uploaded
+    for (const pi of projectImages) {
+      const fs = fileStatuses.get(pi.id);
+      if (fs?.status && processingStatuses.includes(fs.status)) {
+        try {
+          await apiFetch(`/api/projects/${projectId}/images/${pi.id}/status`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "uploaded" }),
+          });
+        } catch { /* silent */ }
+      }
+    }
+    setFileStatuses(new Map());
+    // Reload project
+    if (user && projectId) {
+      const res = await apiFetch(`/api/projects/${projectId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setProjectImages(data.images);
+      }
+    }
+  }, [projectImages, fileStatuses, projectId, user]);
+
+  const handleRetry = useCallback(async (imageId: string) => {
+    try {
+      await apiFetch(`/api/projects/${projectId}/images/${imageId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "uploaded" }),
+      });
+      // Clear local status
+      setFileStatuses((prev) => {
+        const m = new Map(prev);
+        m.delete(imageId);
+        return m;
+      });
+      // Update local state
+      setProjectImages((prev) =>
+        prev.map((pi) => pi.id === imageId ? { ...pi, status: "uploaded" as const } : pi)
+      );
+    } catch { /* silent */ }
+  }, [projectId]);
 
   const getStatusBadge = (pi: ProjectImage) => {
     const fs = fileStatuses.get(pi.id);
@@ -409,6 +520,14 @@ function ProjectContent() {
                   <ExternalLink className="w-4 h-4" /> {i.editor} ({translatedCount})
                 </button>
               )}
+              {isProcessing && (
+                <button
+                  onClick={handleCancel}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 border border-red-100 rounded-xl hover:bg-red-100 transition-all"
+                >
+                  <X className="w-4 h-4" /> {i.cancel}
+                </button>
+              )}
               <button
                 onClick={handleSubmit}
                 disabled={isProcessing || untranslatedImages.length === 0}
@@ -429,10 +548,10 @@ function ProjectContent() {
             <input type="file" multiple accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileChange} />
             <div className="max-w-xs mx-auto space-y-3 pointer-events-none">
               <div className="bg-slate-50 group-hover:bg-indigo-100 w-14 h-14 rounded-2xl flex items-center justify-center mx-auto transition-colors">
-                {uploading ? <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" /> : <Upload className="w-6 h-6 text-slate-400 group-hover:text-indigo-600" />}
+                {uploadTrackerFiles.some((f) => f.status === "uploading") ? <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" /> : <Upload className="w-6 h-6 text-slate-400 group-hover:text-indigo-600" />}
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-700">{uploading ? i.uploading : i.dropTitle}</p>
+                <p className="text-sm font-bold text-slate-700">{uploadTrackerFiles.some((f) => f.status === "uploading") ? i.uploading : i.dropTitle}</p>
                 <p className="text-xs text-slate-400 mt-1">{i.dropDesc}</p>
               </div>
               <div className="mt-3 inline-flex items-center gap-2 bg-indigo-50 text-indigo-600 text-xs px-4 py-2 rounded-full">
@@ -469,7 +588,7 @@ function ProjectContent() {
                             badge.status && processingStatuses.includes(badge.status as any) ? "bg-indigo-100 text-indigo-600" :
                             "bg-slate-100 text-slate-500"
                           }`}>
-                            {badge.status && processingStatuses.includes(badge.status as any) ? "pending" : (badge.status || pi.status)}
+                            {(i.statusLabels as Record<string, string>)[String(badge.status || pi.status)] || badge.status || pi.status}
                           </span>
                         </div>
                         <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
@@ -482,12 +601,23 @@ function ProjectContent() {
                           <p className="text-[10px] text-red-500 mt-1 truncate">{badge.error}</p>
                         )}
                       </div>
-                      <button
-                        onClick={() => removeImage(pi.id)}
-                        className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {(badge.isError || (pi.status === "translating" && !fileStatuses.has(pi.id))) && (
+                          <button
+                            onClick={() => handleRetry(pi.id)}
+                            title={i.retry}
+                            className="p-2 text-slate-300 hover:text-indigo-500 transition-colors"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeImage(pi.id)}
+                          className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -574,6 +704,16 @@ function ProjectContent() {
           </div>
         </aside>
       </div>
+
+      {showUploadTracker && (
+        <UploadTracker
+          files={uploadTrackerFiles}
+          onDismiss={() => setShowUploadTracker(false)}
+          title={i.uploadTracker.title}
+          completeText={i.uploadTracker.complete}
+          failedText={i.uploadTracker.failed}
+        />
+      )}
     </>
   );
 }

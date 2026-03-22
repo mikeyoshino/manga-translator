@@ -120,8 +120,13 @@ async def translate_project_image(
             "Manga context extraction failed (non-fatal): %s\n%s", e, traceback.format_exc()
         )
 
+    def _on_error(reason):
+        projects.update_image_status(image_id, "error")
+        if charge:
+            charge.refund(reason)
+
     return await while_streaming(req, _transform_to_json, conf, img_bytes,
-                                 on_error=charge.refund if charge else None)
+                                 on_error=_on_error)
 
 @router.post("/{project_id}/images/{image_id}/save-result")
 async def save_project_image_result(
@@ -132,6 +137,15 @@ async def save_project_image_result(
     editable_blocks = body.get("editable_blocks", [])
     projects.save_translation_result(user.id, project_id, image_id, translation_response, editable_blocks)
     return projects.get_image_with_urls(image_id)
+
+@router.put("/{project_id}/images/{image_id}/status")
+async def reset_image_status(project_id: str, image_id: str, body: dict, user: AuthUser = Depends(get_current_user)):
+    allowed = {"uploaded", "error"}
+    status = body.get("status")
+    if status not in allowed:
+        raise HTTPException(400, f"Status must be one of {allowed}")
+    projects.update_image_status(image_id, status)
+    return {"ok": True}
 
 @router.put("/{project_id}/images/{image_id}/blocks")
 async def save_image_blocks(project_id: str, image_id: str, body: dict, user: AuthUser = Depends(get_current_user)):
