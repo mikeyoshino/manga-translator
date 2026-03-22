@@ -89,6 +89,7 @@
     "displayNamePlaceholder": "Your name",
     "emailPlaceholder": "you@example.com",
     "passwordPlaceholder": "At least 6 characters",
+    "passwordPlaceholderSignUp": "At least 8 characters",
     "submitting": "Please wait...",
     "signUp": "Sign Up",
     "alreadyHaveAccount": "Already have an account?",
@@ -96,7 +97,15 @@
     "checkEmail": "Check your email",
     "confirmationSent": "We sent a confirmation link to",
     "verifyEmail": "Please verify your email to sign in.",
-    "backToSignIn": "Back to Sign In"
+    "backToSignIn": "Back to Sign In",
+    "confirmPasswordLabel": "Confirm Password",
+    "confirmPasswordPlaceholder": "Re-enter your password",
+    "passwordMismatch": "Passwords do not match",
+    "pwRuleMinLength": "At least 8 characters",
+    "pwRuleLetter": "Contains a letter (a-z)",
+    "pwRuleNumber": "Contains a number (0-9)",
+    "pwRuleSpecial": "Contains a special character (!@#$% etc.)",
+    "pwRuleAsciiOnly": "English characters only (no Thai or other scripts)"
   },
   "navbar": {
     "tokens": "Tokens",
