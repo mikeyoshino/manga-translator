@@ -1,0 +1,81 @@
+# Production compose — uses pre-built images from GitHub Container Registry.
+#
+# Usage:
+#   docker compose -f infra/docker-compose.prod.yml up -d
+
+services:
+  nginx:
+    image: ${NGINX_IMAGE:-ghcr.io/mikeyoshino/manga-translator/nginx:latest}
+    ports:
+      - "80:80"
+    depends_on:
+      front:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      crm:
+        condition: service_started
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  api:
+    image: ${API_IMAGE:-ghcr.io/mikeyoshino/manga-translator/api:latest}
+    expose:
+      - "5003"
+    ports:
+      - "5003:5003"
+    env_file:
+      - ../.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - WORKER_MODE=${WORKER_MODE:-redis}
+      - RUNPOD_API_KEY=${RUNPOD_API_KEY:-}
+      - RUNPOD_ENDPOINT_ID=${RUNPOD_ENDPOINT_ID:-}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.2}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5003/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  front:
+    image: ${FRONT_IMAGE:-ghcr.io/mikeyoshino/manga-translator/front:latest}
+    expose:
+      - "3000"
+    environment:
+      - NODE_ENV=production
+      - VITE_SENTRY_DSN=${VITE_SENTRY_DSN:-}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  crm:
+    image: ${CRM_IMAGE:-ghcr.io/mikeyoshino/manga-translator/crm:latest}
+    expose:
+      - "80"
+    restart: unless-stopped
+
+volumes:
+  redis-data:

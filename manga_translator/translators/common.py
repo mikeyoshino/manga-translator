@@ -11,34 +11,7 @@ try:
 except Exception:
     readline = None
 
-VALID_LANGUAGES = {
-    'CHS': 'Chinese (Simplified)',
-    'CHT': 'Chinese (Traditional)',
-    'CSY': 'Czech',
-    'NLD': 'Dutch',
-    'ENG': 'English',
-    'FRA': 'French',
-    'DEU': 'German',
-    'HUN': 'Hungarian',
-    'ITA': 'Italian',
-    'JPN': 'Japanese',
-    'KOR': 'Korean',
-    'POL': 'Polish',
-    'PTB': 'Portuguese (Brazil)',
-    'ROM': 'Romanian',
-    'RUS': 'Russian',
-    'ESP': 'Spanish',
-    'TRK': 'Turkish',
-    'UKR': 'Ukrainian',
-    'VIN': 'Vietnamese',
-    'ARA': 'Arabic',
-    'CNR': 'Montenegrin',
-    'SRP': 'Serbian',
-    'HRV': 'Croatian',
-    'THA': 'Thai',
-    'IND': 'Indonesian',
-    'FIL': 'Filipino (Tagalog)'
-}
+from manga_shared.config import VALID_LANGUAGES
 
 ISO_639_1_TO_VALID_LANGUAGES = {
     'zh': 'CHS',

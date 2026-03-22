@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "manga-shared"
+version = "0.1.0"
+description = "Shared types, config, and infrastructure for manga-translator services"
+requires-python = ">=3.10,<3.12"
+dependencies = [
+    "pydantic>=2.0",
+    "omegaconf>=2.3",
+    "redis>=5.0",
+    "supabase>=2.0",
+    "sentry-sdk>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["manga_shared*"]

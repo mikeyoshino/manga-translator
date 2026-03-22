@@ -4,18 +4,14 @@ on:
   push:
     branches: [main]
     paths:
+      - 'packages/shared/**'
+      - 'services/**'
+      - 'infra/**'
       - 'server/**'
       - 'front/**'
       - 'crm/**'
       - 'manga_translator/**'
-      - 'docker-compose.yml'
-      - 'docker-compose.prod.yml'
-      - 'Dockerfile.api'
-      - 'Dockerfile.nginx'
-      - 'Dockerfile.runpod'
-      - 'nginx.conf'
-      - 'requirements-api.txt'
-      - 'requirements.txt'
+      - 'requirements*.txt'
   workflow_dispatch:
     inputs:
       deploy_api:
@@ -30,6 +26,10 @@ on:
         description: 'Deploy RunPod Worker'
         type: boolean
         default: false
+      deploy_crm:
+        description: 'Deploy CRM'
+        type: boolean
+        default: false
       deploy_all:
         description: 'Deploy ALL services'
         type: boolean
@@ -40,6 +40,7 @@ env:
   API_IMAGE: ghcr.io/${{ github.repository }}/api
   FRONT_IMAGE: ghcr.io/${{ github.repository }}/front
   NGINX_IMAGE: ghcr.io/${{ github.repository }}/nginx
+  CRM_IMAGE: ghcr.io/${{ github.repository }}/crm
   RUNPOD_IMAGE: ghcr.io/${{ github.repository }}/runpod-worker
 
 jobs:
@@ -51,6 +52,7 @@ jobs:
       front: ${{ steps.changes.outputs.front }}
       nginx: ${{ steps.changes.outputs.nginx }}
       worker: ${{ steps.changes.outputs.worker }}
+      crm: ${{ steps.changes.outputs.crm }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,11 +68,13 @@ jobs:
               echo "front=true" >> $GITHUB_OUTPUT
               echo "nginx=true" >> $GITHUB_OUTPUT
               echo "worker=true" >> $GITHUB_OUTPUT
+              echo "crm=true" >> $GITHUB_OUTPUT
             else
               echo "api=${{ github.event.inputs.deploy_api }}" >> $GITHUB_OUTPUT
               echo "front=${{ github.event.inputs.deploy_front }}" >> $GITHUB_OUTPUT
-              echo "nginx=${{ github.event.inputs.deploy_api || github.event.inputs.deploy_front }}" >> $GITHUB_OUTPUT
+              echo "nginx=${{ github.event.inputs.deploy_api || github.event.inputs.deploy_front || github.event.inputs.deploy_crm }}" >> $GITHUB_OUTPUT
               echo "worker=${{ github.event.inputs.deploy_worker }}" >> $GITHUB_OUTPUT
+              echo "crm=${{ github.event.inputs.deploy_crm }}" >> $GITHUB_OUTPUT
             fi
             exit 0
           fi
@@ -84,44 +88,59 @@ jobs:
           FRONT=false
           NGINX=false
           WORKER=false
+          CRM=false
 
-          # API: server/**, Dockerfile.api, requirements-api.txt, manga_translator/**
-          if echo "$CHANGED" | grep -qE '^(server/|Dockerfile\.api|requirements-api\.txt|manga_translator/)'; then
+          # Shared package changes affect API and Worker
+          if echo "$CHANGED" | grep -qE '^packages/shared/'; then
+            API=true
+            WORKER=true
+          fi
+
+          # API: services/api/**, server/**, legacy Dockerfile.api/requirements-api.txt (transition)
+          if echo "$CHANGED" | grep -qE '^(services/api/|server/|Dockerfile\.api|requirements-api\.txt|manga_translator/config\.py)'; then
             API=true
           fi
 
-          # Frontend: front/**
-          if echo "$CHANGED" | grep -qE '^front/'; then
+          # Frontend: front/**, services/front/**
+          if echo "$CHANGED" | grep -qE '^(front/|services/front/)'; then
             FRONT=true
           fi
 
-          # Nginx + CRM: crm/**, nginx.conf, Dockerfile.nginx
-          if echo "$CHANGED" | grep -qE '^(crm/|nginx\.conf|Dockerfile\.nginx)'; then
+          # Nginx: infra/nginx/**, nginx.conf
+          if echo "$CHANGED" | grep -qE '^(infra/nginx/|nginx\.conf)'; then
             NGINX=true
           fi
 
-          # Worker: Dockerfile.runpod, requirements.txt, manga_translator/**, server/runpod_handler.py, server/smart_routing.py
-          if echo "$CHANGED" | grep -qE '^(Dockerfile\.runpod|requirements\.txt|manga_translator/|server/runpod_handler\.py|server/smart_routing\.py)'; then
+          # CRM: crm/**, services/crm/**
+          if echo "$CHANGED" | grep -qE '^(crm/|services/crm/)'; then
+            CRM=true
+            NGINX=true
+          fi
+
+          # Worker: services/worker/**, Dockerfile.runpod, requirements.txt, manga_translator/**
+          if echo "$CHANGED" | grep -qE '^(services/worker/|Dockerfile\.runpod|requirements\.txt|manga_translator/|server/runpod_handler\.py|server/smart_routing\.py)'; then
             WORKER=true
           fi
 
           # Shared files that affect everything
-          if echo "$CHANGED" | grep -qE '^(docker-compose\.yml|docker-compose\.prod\.yml)'; then
+          if echo "$CHANGED" | grep -qE '^(infra/docker-compose|docker-compose)'; then
             API=true
             FRONT=true
             NGINX=true
             WORKER=true
+            CRM=true
           fi
 
           echo "api=$API" >> $GITHUB_OUTPUT
           echo "front=$FRONT" >> $GITHUB_OUTPUT
           echo "nginx=$NGINX" >> $GITHUB_OUTPUT
           echo "worker=$WORKER" >> $GITHUB_OUTPUT
+          echo "crm=$CRM" >> $GITHUB_OUTPUT
 
   build-and-push:
     name: Build & Push Images
     needs: detect-changes
-    if: needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.front == 'true' || needs.detect-changes.outputs.nginx == 'true' || needs.detect-changes.outputs.worker == 'true'
+    if: needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.front == 'true' || needs.detect-changes.outputs.nginx == 'true' || needs.detect-changes.outputs.worker == 'true' || needs.detect-changes.outputs.crm == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -144,7 +163,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Dockerfile.api
+          file: services/api/Dockerfile
           push: true
           tags: ${{ env.API_IMAGE }}:latest,${{ env.API_IMAGE }}:${{ github.sha }}
           cache-from: type=gha
@@ -167,14 +186,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build and push Nginx + CRM image
+      - name: Build and push Nginx image
         if: needs.detect-changes.outputs.nginx == 'true'
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: Dockerfile.nginx
+          context: infra/nginx
+          file: infra/nginx/Dockerfile
           push: true
           tags: ${{ env.NGINX_IMAGE }}:latest,${{ env.NGINX_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push CRM image
+        if: needs.detect-changes.outputs.crm == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/crm/Dockerfile
+          push: true
+          tags: ${{ env.CRM_IMAGE }}:latest,${{ env.CRM_IMAGE }}:${{ github.sha }}
           build-args: |
             VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
             VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
@@ -186,7 +216,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Dockerfile.runpod
+          file: services/worker/Dockerfile.runpod
           push: true
           tags: ${{ env.RUNPOD_IMAGE }}:latest,${{ env.RUNPOD_IMAGE }}:${{ github.sha }}
           cache-from: type=gha
@@ -204,13 +234,12 @@ jobs:
           CURRENT=$(curl -s -X POST "https://api.runpod.io/graphql?api_key=${{ secrets.RUNPOD_API_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{"query": "{ myself { endpoints { template { id name dockerArgs containerDiskInGb volumeInGb env { key value } } } } }"}')
-          echo "Fetch response: $CURRENT"
           echo "current_template=$CURRENT" >> "$GITHUB_OUTPUT"
 
       - name: Update RunPod template image
         run: |
           python3 -c "
-          import json, subprocess, sys, os
+          import json, os
 
           current = json.loads(os.environ['CURRENT_TEMPLATE'])
           t = current['data']['myself']['endpoints'][0]['template']
@@ -223,7 +252,6 @@ jobs:
 
           mutation = f'mutation {{ saveTemplate(input: {{ id: \"{template_id}\", name: \"{t[\"name\"]}\", imageName: \"{new_image}\", dockerArgs: \"{docker_args}\", containerDiskInGb: {t[\"containerDiskInGb\"]}, volumeInGb: {t[\"volumeInGb\"]}, env: [{env_items}] }}) {{ id imageName }} }}'
           payload = json.dumps({'query': mutation})
-          print(f'Mutation payload: {payload}')
           with open('mutation.json', 'w') as f:
               f.write(payload)
           "
@@ -243,7 +271,7 @@ jobs:
   deploy:
     name: Deploy to Contabo VPS
     needs: [detect-changes, build-and-push]
-    if: always() && (needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.front == 'true' || needs.detect-changes.outputs.nginx == 'true') && needs.build-and-push.result == 'success'
+    if: always() && (needs.detect-changes.outputs.api == 'true' || needs.detect-changes.outputs.front == 'true' || needs.detect-changes.outputs.nginx == 'true' || needs.detect-changes.outputs.crm == 'true') && needs.build-and-push.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -276,13 +304,16 @@ jobs:
             if [ "${{ needs.detect-changes.outputs.nginx }}" = "true" ]; then
               PULL_SERVICES="$PULL_SERVICES nginx"
             fi
+            if [ "${{ needs.detect-changes.outputs.crm }}" = "true" ]; then
+              PULL_SERVICES="$PULL_SERVICES crm"
+            fi
 
             if [ -n "$PULL_SERVICES" ]; then
-              docker compose -f docker-compose.prod.yml pull $PULL_SERVICES
-              docker compose -f docker-compose.prod.yml up -d --force-recreate $PULL_SERVICES
+              docker compose -f infra/docker-compose.prod.yml pull $PULL_SERVICES
+              docker compose -f infra/docker-compose.prod.yml up -d --force-recreate $PULL_SERVICES
 
               # Restart nginx so it resolves the new container IPs
-              docker compose -f docker-compose.prod.yml restart nginx
+              docker compose -f infra/docker-compose.prod.yml restart nginx
             fi
 
             # Clean up old images
