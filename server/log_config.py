@@ -1,26 +1,11 @@
-import logging
-import json
-from contextvars import ContextVar
+"""
+Re-exports logging config from manga_shared for backward compatibility.
 
-correlation_id: ContextVar[str] = ContextVar("correlation_id", default="-")
+All definitions now live in packages/shared/manga_shared/log_config.py.
+"""
 
-
-class JSONFormatter(logging.Formatter):
-    def format(self, record):
-        log = {
-            "timestamp": self.formatTime(record),
-            "level": record.levelname,
-            "logger": record.name,
-            "message": record.getMessage(),
-            "correlation_id": correlation_id.get("-"),
-        }
-        if record.exc_info and record.exc_info[0]:
-            log["exception"] = self.formatException(record.exc_info)
-        return json.dumps(log)
-
-
-def setup_logging(level=logging.INFO):
-    handler = logging.StreamHandler()
-    handler.setFormatter(JSONFormatter())
-    logging.root.handlers = [handler]
-    logging.root.setLevel(level)
+from manga_shared.log_config import (  # noqa: F401
+    correlation_id,
+    JSONFormatter,
+    setup_logging,
+)

@@ -1,0 +1,77 @@
+# Multi-VPS deployment — Worker runs on a separate GPU VPS.
+#
+# VPS-A (API + Frontend): docker compose -f infra/docker-compose.split.yml --profile api up -d
+# VPS-B (Worker only):    docker compose -f infra/docker-compose.split.yml --profile worker up -d
+
+services:
+  # --- API VPS profile ---
+  nginx:
+    image: ${NGINX_IMAGE:-ghcr.io/mikeyoshino/manga-translator/nginx:latest}
+    profiles: ["api"]
+    ports:
+      - "80:80"
+    depends_on:
+      - front
+      - api
+      - crm
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["api"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  api:
+    image: ${API_IMAGE:-ghcr.io/mikeyoshino/manga-translator/api:latest}
+    profiles: ["api"]
+    ports:
+      - "5003:5003"
+    env_file:
+      - ../.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  front:
+    image: ${FRONT_IMAGE:-ghcr.io/mikeyoshino/manga-translator/front:latest}
+    profiles: ["api"]
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  crm:
+    image: ${CRM_IMAGE:-ghcr.io/mikeyoshino/manga-translator/crm:latest}
+    profiles: ["api"]
+    expose:
+      - "80"
+    restart: unless-stopped
+
+  # --- Worker VPS profile ---
+  worker:
+    image: ${WORKER_IMAGE:-ghcr.io/mikeyoshino/manga-translator/worker:latest}
+    profiles: ["worker"]
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://localhost:6379/0}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  redis-data:

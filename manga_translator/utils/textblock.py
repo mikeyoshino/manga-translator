@@ -9,32 +9,7 @@ import py3langid as langid
 from shapely.geometry import Polygon, MultiPoint
 
 from .generic2 import color_difference, is_right_to_left_char, is_valuable_char
-
-# determines render direction
-LANGUAGE_ORIENTATION_PRESETS = {
-    'CHS': 'auto',
-    'CHT': 'auto',
-    'CSY': 'h',
-    'NLD': 'h',
-    'ENG': 'h',
-    'FRA': 'h',
-    'DEU': 'h',
-    'HUN': 'h',
-    'ITA': 'h',
-    'JPN': 'auto',
-    'KOR': 'h',
-    'POL': 'h',
-    'PTB': 'h',
-    'ROM': 'h',
-    'RUS': 'h',
-    'ESP': 'h',
-    'TRK': 'h',
-    'UKR': 'h',
-    'VIN': 'h',
-    'ARA': 'hr',  # horizontal reversed (right to left)
-    'FIL': 'h',
-    'THA': 'h',
-}
+from manga_shared.config import LANGUAGE_ORIENTATION_PRESETS
 
 
 class TextBlock(object):

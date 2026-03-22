@@ -10,8 +10,10 @@ Manga/image translation tool with a multi-stage pipeline: text detection → OCR
 
 ```bash
 # Install dependencies
-pip install -r requirements.txt
-pip install -r requirements-dev.txt  # dev tools: pytest, pylint
+pip install -e packages/shared/        # shared package (required first)
+pip install -r requirements.txt        # worker/ML deps
+pip install -r requirements-api.txt    # API-only deps
+pip install -r requirements-dev.txt    # dev tools: pytest, pylint
 
 # Run CLI translation (single image)
 python -m manga_translator local -i <image_path>
@@ -19,14 +21,17 @@ python -m manga_translator local -i <image_path>
 # Run CLI translation (batch)
 python -m manga_translator local -i <folder_path> -o <output_folder>
 
-# Run WebSocket server
-python -m manga_translator ws --host 0.0.0.0 --port 5003
-
-# Run shared/API server
-python -m manga_translator shared --host 0.0.0.0 --port 5003
-
-# Run FastAPI web server
+# Run FastAPI web server (legacy path, still works)
 python server/main.py --verbose --start-instance --host=0.0.0.0 --port=5003
+
+# Run FastAPI web server (new modular path)
+PYTHONPATH=.:services/api uvicorn api.main:app --host 0.0.0.0 --port 5003
+
+# Run GPU worker (legacy path, still works)
+python -m server.worker --use-gpu --verbose
+
+# Run GPU worker (new modular path)
+PYTHONPATH=.:services/worker python -m worker.main --use-gpu --verbose
 
 # Run GUI
 python MangaStudioMain.py
@@ -46,19 +51,68 @@ pytest test/test_translation.py::test_single_language
 # Lint
 pylint $(git ls-files '*.py')
 
-# Docker
-docker build . --tag=manga-image-translator
+# Docker (dev — all services)
+docker compose -f infra/docker-compose.yml up
+
+# Docker (prod — pre-built images)
+docker compose -f infra/docker-compose.prod.yml up -d
 ```
 
 ## Architecture
 
+### Modular Monorepo Structure
+
+The project is structured as a modular monorepo with independently deployable services:
+
+```
+manga-translator/
+├── packages/shared/manga_shared/    # Shared Python package (config, Redis, Supabase, logging)
+├── services/
+│   ├── api/api/                     # FastAPI API server (routes, services, adapters, middleware)
+│   ├── worker/worker/               # ML Translation Worker (Redis consumer + RunPod handler)
+│   ├── front/                       # React Frontend (placeholder — code still in /front)
+│   └── crm/                         # CRM Admin Panel (standalone Dockerfile)
+├── infra/                           # Docker Compose configs + nginx
+│   ├── nginx/                       # Pure nginx (proxies to services)
+│   ├── docker-compose.yml           # Dev: build from source
+│   ├── docker-compose.prod.yml      # Prod: GHCR images
+│   └── docker-compose.split.yml     # Multi-VPS deployment
+├── server/                          # Legacy API code (re-exports from services/api during transition)
+├── manga_translator/                # ML pipeline (stays here, used by worker)
+├── front/                           # React frontend source
+└── crm/                             # CRM admin source
+```
+
+### Shared Package (`packages/shared/manga_shared/`)
+Single source of truth for types shared between API and Worker:
+- `config.py` — Config, enums (Detector, Ocr, Translator, etc.), Context, TranslatorChain, VALID_LANGUAGES
+- `redis_protocol.py` — Redis connection pool, stream constants, job queue, pub/sub, worker registry
+- `supabase_client.py` — Service-role Supabase client for token operations
+- `log_config.py` — JSON structured logging with correlation IDs
+- `monitoring.py` — Sentry initialization
+
+### API Service (`services/api/api/`)
+Lightweight FastAPI server (no ML dependencies):
+- `routes/` — auth, translate, projects, payment, admin, health
+- `services/` — auth, token_guard, payment, projects, admin_queries, context_extraction
+- `models/` — request/response Pydantic models
+- `adapters/` — redis_queue (dual Redis/RunPod mode), runpod, smart_routing
+- `middleware/` — auth cookie refresh, request logging
+
+### Worker Service (`services/worker/worker/`)
+GPU worker consuming Redis Stream jobs:
+- `main.py` — TranslationWorker class with Redis consumer loop
+- `runpod_handler.py` — RunPod Serverless handler
+- `pipeline/` — (transitional) ML pipeline stays in `manga_translator/`
+
 ### Translation Pipeline (`manga_translator/manga_translator.py`)
-The core ~138KB file orchestrating the full pipeline. Each stage has swappable implementations selected via enums in `config.py`.
+The core ~138KB file orchestrating the full pipeline. Each stage has swappable implementations selected via enums in `packages/shared/manga_shared/config.py`.
 
 ### Entry Points
 - **CLI**: `manga_translator/__main__.py` → dispatches to mode handlers in `manga_translator/mode/`
 - **GUI**: `MangaStudioMain.py` → PySide6 app in `MangaStudio_Data/app/`
-- **Web Server**: `server/main.py` → FastAPI with REST (`/translate/json`, `/translate/bytes`) and WebSocket endpoints
+- **API Server**: `services/api/api/main.py` (or legacy `server/main.py`) → FastAPI
+- **Worker**: `services/worker/worker/main.py` (or legacy `server/worker.py`) → Redis consumer
 
 ### Pipeline Components (each in its own subdirectory under `manga_translator/`)
 - `detection/` — Text region detectors (DBNET, CTD, CRAFT, Paddle)
@@ -71,14 +125,23 @@ The core ~138KB file orchestrating the full pipeline. Each stage has swappable i
 - `colorization/` — Image colorization
 
 ### Key Modules
-- `config.py` — Pydantic models and enums for all component types (Detector, Ocr, Translator, Inpainter, etc.)
-- `args.py` — CLI argument parsing with subcommands: `local`, `ws`, `shared`, `config-help`
-- `utils/textblock.py` — Core `TextBlock` data structure for text regions
-- `utils/generic.py` — Shared helpers and image processing utilities
-- `server/token_guard.py` — `TokenCharge` class with idempotent refund and `deduct_or_raise()` helper for all paid endpoints
+- `packages/shared/manga_shared/config.py` — Pydantic models and enums for all component types (canonical source)
+- `manga_translator/config.py` — Re-exports from `manga_shared` for backward compatibility
+- `manga_translator/args.py` — CLI argument parsing with subcommands: `local`, `ws`, `shared`, `config-help`
+- `manga_translator/utils/textblock.py` — Core `TextBlock` data structure for text regions
+- `services/api/api/services/token_guard.py` — `TokenCharge` class with idempotent refund
+
+### Dependency Graph
+```
+services/front  ──HTTP──→  services/api
+services/crm   ──HTTP──→  services/api
+services/api   ──Redis──→  services/worker
+    │                          │
+    └── depends on ──→  packages/shared  ←── depends on ──┘
+```
 
 ### Translator Chains
-Translators can be chained: `--translator "chatgpt:JPN;sugoi:ENG"` runs ChatGPT first (→JPN), then Sugoi (→ENG). Parsed by `TranslatorChain` in `config.py`.
+Translators can be chained: `--translator "chatgpt:JPN;sugoi:ENG"` runs ChatGPT first (→JPN), then Sugoi (→ENG). Parsed by `TranslatorChain` in `manga_shared/config.py`.
 
 ## Configuration
 
@@ -146,7 +209,7 @@ JSON keys are namespaced: `landing`, `login`, `navbar`, `home`, `project`, `topu
 ## Observability & Logging Rules
 
 - **Always add structured logging** when writing new code. Use `logging.getLogger(__name__)` and log key operations (start, success, failure) with relevant context (IDs, durations, error details).
-- **Server code**: Use the JSON formatter from `server/log_config.py`. Set `correlation_id` in request-handling paths.
+- **Server code**: Use the JSON formatter from `manga_shared.log_config`. Set `correlation_id` in request-handling paths.
 - **Error tracking**: Sentry Cloud captures errors from API, Worker, and Client. DSN configured via `SENTRY_DSN` (backend) / `VITE_SENTRY_DSN` (frontend) env vars.
 - **When adding try/except**: Always call `sentry_sdk.capture_exception(e)` and `logger.error(...)` with context before re-raising or handling.
 
@@ -154,7 +217,7 @@ JSON keys are namespaced: `landing`, `login`, `navbar`, `home`, `project`, `topu
 
 All paid endpoints (`/translate/with-form/*`, `/inpaint`, `/projects/.../translate`) deduct tokens before work starts and refund on failure.
 
-### How it works (`server/token_guard.py`)
+### How it works (`services/api/api/services/token_guard.py`)
 - `deduct_or_raise(user_id, amount, reference, is_admin)` — deducts tokens or raises HTTP 402. Returns `None` for admins.
 - `TokenCharge.refund(reason)` — idempotent (safe to call multiple times). Credits tokens back with `type_="refund"`. On refund failure, logs ERROR and sends a Sentry fatal message for ops alerting.
 

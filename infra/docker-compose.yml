@@ -1,0 +1,93 @@
+services:
+  nginx:
+    build:
+      context: ..
+      dockerfile: infra/nginx/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - front
+      - api
+      - crm
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  api:
+    build:
+      context: ..
+      dockerfile: services/api/Dockerfile
+    expose:
+      - "5003"
+    ports:
+      - "5003:5003"
+    env_file:
+      - ../.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-development}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5003/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ..
+      dockerfile: services/worker/Dockerfile
+    env_file:
+      - ../.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-development}
+    volumes:
+      - ../models:/app/models
+      - ../result:/app/result
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  front:
+    build:
+      context: ../front
+      dockerfile: Dockerfile
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+        - VITE_SENTRY_DSN=${VITE_SENTRY_DSN:-}
+        - VITE_SECURE_HOST=${VITE_SECURE_HOST:-}
+        - VITE_STUDIO_HOST=${VITE_STUDIO_HOST:-}
+    expose:
+      - "3000"
+    environment:
+      - NODE_ENV=production
+
+  crm:
+    build:
+      context: ..
+      dockerfile: services/crm/Dockerfile
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    expose:
+      - "80"
+    environment:
+      - NODE_ENV=production
+
+volumes:
+  redis-data:

@@ -24,55 +24,8 @@ except AttributeError: # Supports Python versions below 3.8
 MODULE_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BASE_PATH = os.path.dirname(MODULE_PATH)
 
-# Adapted from argparse.Namespace
-class Context(dict):
-    def __init__(self, **kwargs):
-        for name in kwargs:
-            setattr(self, name, kwargs[name])
-    
-    def __getattr__(self, item):
-        return self.get(item)
-    
-    def __delattr__(self, key) -> None:
-        return self.__delitem__(key)
-
-    def __setattr__(self, key, value):
-        return self.__setitem__(key, value)
-
-    def __getstate__(self):
-        return self.copy()
-
-    def __setstate__(self, state):
-        self.update(state)
-
-    def __eq__(self, other):
-        if not isinstance(other, Context):
-            return NotImplemented
-        return dict(self) == dict(other)
-
-    def __contains__(self, key):
-        return key in self.keys()
-    
-    def __repr__(self):
-        type_name = type(self).__name__
-        arg_strings = []
-        star_args = {}
-        for arg in self._get_args():
-            arg_strings.append(repr(arg))
-        for name, value in self._get_kwargs():
-            if name.isidentifier():
-                arg_strings.append('%s=%r' % (name, value))
-            else:
-                star_args[name] = value
-        if star_args:
-            arg_strings.append('**%s' % repr(star_args))
-        return '%s(%s)' % (type_name, ', '.join(arg_strings))
-
-    def _get_kwargs(self):
-        return list(self.items())
-
-    def _get_args(self):
-        return []
+# Re-exported from manga_shared for backward compatibility
+from manga_shared.config import Context
 
 # TODO: Add TranslationContext for type linting
 
