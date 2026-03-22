@@ -26,6 +26,7 @@ RUN export TZ=Etc/UTC \
 COPY manga_translator /app/manga_translator
 COPY server /app/server
 COPY services/worker /app/services/worker
+COPY fonts /app/fonts
 
 # Prepare models
 COPY docker_prepare.py /app/docker_prepare.py
