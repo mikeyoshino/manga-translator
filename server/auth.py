@@ -6,6 +6,8 @@ Supports both Bearer token (for external API clients) and httpOnly cookies
 
 import logging
 import os
+import time
+import threading
 
 from fastapi import Depends, HTTPException, Request, Response
 from pydantic import BaseModel
@@ -14,6 +16,13 @@ from supabase import create_client
 
 logger = logging.getLogger(__name__)
 
+# Cache refreshed sessions briefly to prevent concurrent requests from
+# each trying to refresh the same (now-revoked) Supabase refresh token.
+# Key: old_refresh_token → Value: (new_session, timestamp)
+_refresh_cache: dict[str, tuple] = {}
+_refresh_lock = threading.Lock()
+_REFRESH_CACHE_TTL = 30  # seconds
+
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 ADMIN_EMAILS = {e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()}
@@ -21,6 +30,7 @@ ADMIN_EMAILS = {e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split("
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() in ("true", "1", "yes")
 COOKIE_SAMESITE = "lax"
 COOKIE_PATH = "/"
+COOKIE_DOMAIN = os.getenv("COOKIE_DOMAIN", "")  # e.g. ".wunplae.com" for cross-subdomain
 ACCESS_TOKEN_MAX_AGE = 3600       # 1 hour
 REFRESH_TOKEN_MAX_AGE = 604800    # 7 days
 
@@ -44,6 +54,7 @@ class AuthUser(BaseModel):
 
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str):
     """Set httpOnly auth cookies on a response."""
+    domain_kwargs = {"domain": COOKIE_DOMAIN} if COOKIE_DOMAIN else {}
     response.set_cookie(
         key="sb-access-token",
         value=access_token,
@@ -52,6 +63,7 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         samesite=COOKIE_SAMESITE,
         path=COOKIE_PATH,
         max_age=ACCESS_TOKEN_MAX_AGE,
+        **domain_kwargs,
     )
     response.set_cookie(
         key="sb-refresh-token",
@@ -61,13 +73,15 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         samesite=COOKIE_SAMESITE,
         path=COOKIE_PATH,
         max_age=REFRESH_TOKEN_MAX_AGE,
+        **domain_kwargs,
     )
 
 
 def _clear_auth_cookies(response: Response):
     """Clear auth cookies from a response."""
-    response.delete_cookie(key="sb-access-token", path=COOKIE_PATH)
-    response.delete_cookie(key="sb-refresh-token", path=COOKIE_PATH)
+    domain_kwargs = {"domain": COOKIE_DOMAIN} if COOKIE_DOMAIN else {}
+    response.delete_cookie(key="sb-access-token", path=COOKIE_PATH, **domain_kwargs)
+    response.delete_cookie(key="sb-refresh-token", path=COOKIE_PATH, **domain_kwargs)
 
 
 def _verify_token(token: str):
@@ -78,6 +92,41 @@ def _verify_token(token: str):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid token")
     return user
+
+
+def _refresh_with_cache(refresh_token: str):
+    """Refresh a Supabase session, caching the result briefly.
+
+    Supabase refresh tokens are single-use: once rotated, the old token is
+    revoked.  If multiple concurrent requests arrive with the same expired
+    access token, only the first should call Supabase; the rest reuse the
+    cached new session.
+    """
+    now = time.monotonic()
+
+    with _refresh_lock:
+        # Evict stale entries
+        stale = [k for k, (_, ts) in _refresh_cache.items() if now - ts > _REFRESH_CACHE_TTL]
+        for k in stale:
+            del _refresh_cache[k]
+
+        # Check cache
+        if refresh_token in _refresh_cache:
+            cached_session, _ = _refresh_cache[refresh_token]
+            return cached_session
+
+    # Not cached — call Supabase (outside lock to avoid blocking)
+    client = _get_auth_client()
+    refreshed = client.auth.refresh_session(refresh_token)
+    if not refreshed or not refreshed.session:
+        raise HTTPException(status_code=401, detail="Token refresh failed")
+
+    new_session = refreshed.session
+
+    with _refresh_lock:
+        _refresh_cache[refresh_token] = (new_session, time.monotonic())
+
+    return new_session
 
 
 async def get_current_user(request: Request) -> AuthUser:
@@ -110,11 +159,7 @@ async def get_current_user(request: Request) -> AuthUser:
         if not refresh_token or auth_header:
             raise
         try:
-            client = _get_auth_client()
-            refreshed = client.auth.refresh_session(refresh_token)
-            if not refreshed or not refreshed.session:
-                raise HTTPException(status_code=401, detail="Token refresh failed")
-            new_session = refreshed.session
+            new_session = _refresh_with_cache(refresh_token)
             user = new_session.user
             if not user:
                 raise HTTPException(status_code=401, detail="Token refresh failed")

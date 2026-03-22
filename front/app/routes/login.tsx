@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
 import { useAuth } from "@/context/AuthContext";
 import { BookOpen } from "lucide-react";
-import { useLocalePath, useT } from "@/context/LocaleContext";
+import { useLocale, useT } from "@/context/LocaleContext";
+
+const STUDIO_HOST = import.meta.env.VITE_STUDIO_HOST || "";
 
 export default function LoginPage() {
   const { signIn, signUp, user } = useAuth();
-  const navigate = useNavigate();
-  const lp = useLocalePath();
+  const locale = useLocale();
   const i = useT().login;
 
   const [isSignUp, setIsSignUp] = useState(false);
@@ -21,9 +21,13 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate(lp("/studio"));
+      if (STUDIO_HOST) {
+        window.location.href = `${STUDIO_HOST}/${locale}/studio`;
+      } else {
+        window.location.href = `/${locale}/studio`;
+      }
     }
-  }, [user, navigate]);
+  }, [user, locale]);
 
   if (user) return null;
 
@@ -45,7 +49,11 @@ export default function LoginPage() {
         if (err) {
           setError(err.message);
         } else {
-          navigate(lp("/studio"));
+          if (STUDIO_HOST) {
+            window.location.href = `${STUDIO_HOST}/${locale}/studio`;
+          } else {
+            window.location.href = `/${locale}/studio`;
+          }
         }
       }
     } finally {
