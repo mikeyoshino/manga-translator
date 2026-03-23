@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Code Rules
+
+- **No magic strings for enums** — Always use enum members (e.g., `Detector.DBNET`) instead of raw strings (`"dbnet"`). If an enum exists for a value, reference it.
+- **Unit tests required** — Every refactor and new feature must include unit tests. Update existing tests if behavior changes.
+- **Run tests before done** — Always run `pytest` and confirm tests pass before declaring work complete.
+- **DRY** — Don't Repeat Yourself. Extract shared logic rather than duplicating code.
+- **Clean Code** — Meaningful names, small focused functions, no dead code, clear intent.
+
 ## Project Overview
 
 Manga/image translation tool with a multi-stage pipeline: text detection → OCR → text merging → inpainting → translation → rendering. Supports 30+ translation backends, multiple detection/OCR models, and runs as CLI, GUI (PySide6), or web server (FastAPI).
