@@ -275,7 +275,7 @@ function ProjectContent() {
     if (untranslatedImages.length === 0) return;
     if (!isAdmin && tokenBalance < untranslatedImages.length) {
       alert(i.insufficientTokens.replace("{need}", String(untranslatedImages.length)).replace("{have}", String(tokenBalance)));
-      navigate(lp("/studio/topup"));
+      navigate(lp("/subscription"));
       return;
     }
     // Set up file statuses for untranslated images

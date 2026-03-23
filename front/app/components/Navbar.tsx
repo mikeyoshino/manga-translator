@@ -12,7 +12,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useLocale, useLocalePath, useSecureUrl, useT } from "@/context/LocaleContext";
+import { useLocale, useLocalePath, useT } from "@/context/LocaleContext";
 
 
 interface NavbarProps {
@@ -42,10 +42,9 @@ export function Navbar({ showBack = false, showLanguageToggle = false }: NavbarP
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const secureUrl = useSecureUrl();
   const handleSignOut = async () => {
     await signOut();
-    window.location.href = secureUrl("/login");
+    window.location.href = lp("/login");
   };
 
   // Build the "other locale" version of the current path
@@ -86,7 +85,7 @@ export function Navbar({ showBack = false, showLanguageToggle = false }: NavbarP
           </div>
         ) : (
           <button
-            onClick={() => navigate(lp("/studio/topup"))}
+            onClick={() => navigate(lp("/subscription"))}
             className="flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full hover:bg-emerald-100 transition-colors"
           >
             <Coins className="w-3.5 h-3.5 text-emerald-600" />
@@ -114,7 +113,7 @@ export function Navbar({ showBack = false, showLanguageToggle = false }: NavbarP
                 <button onClick={() => { setProfileOpen(false); navigate(lp("/studio/profile")); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                   <User className="w-4 h-4 text-slate-400" /> {i.profile}
                 </button>
-                <button onClick={() => { setProfileOpen(false); navigate(lp("/studio/topup")); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                <button onClick={() => { setProfileOpen(false); navigate(lp("/subscription")); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                   <CreditCard className="w-4 h-4 text-slate-400" /> {i.subscription}
                 </button>
                 <button onClick={() => { setProfileOpen(false); navigate(lp("/studio/token-usage")); }} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">

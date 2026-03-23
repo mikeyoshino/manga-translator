@@ -43,7 +43,7 @@ services:
       - SENTRY_DSN=${SENTRY_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.2}
-      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-.wunplae.com}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-wunplae.com}
       - COOKIE_SECURE=${COOKIE_SECURE:-true}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5003/health')"]

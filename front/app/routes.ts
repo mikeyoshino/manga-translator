@@ -9,7 +9,7 @@ export default [
       route("studio", "routes/home.tsx"),
       route("studio/editor", "routes/editor.tsx"),
       route("studio/projects/:projectId", "routes/project.tsx"),
-      route("studio/topup", "routes/topup.tsx"),
+      route("subscription", "routes/subscription.tsx"),
       route("studio/token-usage", "routes/token-usage.tsx"),
       route("studio/profile", "routes/profile.tsx"),
     ]),

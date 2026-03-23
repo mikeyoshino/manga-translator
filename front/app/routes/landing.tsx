@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/landing";
-import { useLocale, useLocalePath, useSecureUrl, useT } from "@/context/LocaleContext";
+import { useLocale, useLocalePath, useT } from "@/context/LocaleContext";
 import type { Locale } from "@/context/LocaleContext";
 import { getMessages } from "@/i18n";
 import {
@@ -83,7 +83,6 @@ const featureIcons: LucideIcon[] = [
 export default function LandingPage() {
   const lang = useLocale();
   const lp = useLocalePath();
-  const loginUrl = useSecureUrl();
   const otherLocale = lang === "th" ? "en" : "th";
   const [sliderPosition, setSliderPosition] = useState(50);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
@@ -155,13 +154,13 @@ export default function LandingPage() {
                 {t.nav.lang}
               </Link>
               <a
-                href={loginUrl("/login")}
+                href={lp("/login")}
                 className="hidden sm:block text-slate-600 font-medium hover:text-indigo-600 transition-colors"
               >
                 {t.nav.login}
               </a>
               <a
-                href={loginUrl("/login")}
+                href={lp("/login")}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium shadow-sm shadow-indigo-200 transition-all hover:-translate-y-0.5"
               >
                 {t.nav.startFree}
@@ -191,7 +190,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <a
-                href={loginUrl("/login")}
+                href={lp("/login")}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-semibold text-lg shadow-lg shadow-indigo-200 transition-all hover:-translate-y-1 flex justify-center items-center gap-2"
               >
                 {t.hero.cta} <ArrowRight className="w-5 h-5" />
@@ -484,7 +483,7 @@ export default function LandingPage() {
 
                 {/* CTA */}
                 <a
-                  href={loginUrl("/login")}
+                  href={lp("/login")}
                   className={`block w-full py-3 rounded-xl font-semibold text-center transition-all mb-6 ${
                     tier.popular
                       ? "bg-white text-indigo-600 hover:bg-slate-50 shadow-sm"
@@ -540,7 +539,7 @@ export default function LandingPage() {
               {t.footer.cta}
             </h2>
             <a
-              href={loginUrl("/login")}
+              href={lp("/login")}
               className="inline-block bg-white text-indigo-600 px-10 py-4 rounded-2xl font-semibold text-lg hover:bg-slate-50 shadow-sm transition-transform hover:-translate-y-1 relative z-10"
             >
               {t.footer.btn}

@@ -3,8 +3,6 @@ import { useAuth } from "@/context/AuthContext";
 import { BookOpen } from "lucide-react";
 import { useLocale, useT } from "@/context/LocaleContext";
 
-const STUDIO_HOST = import.meta.env.VITE_STUDIO_HOST || "";
-
 export default function LoginPage() {
   const { signIn, signUp, user } = useAuth();
   const locale = useLocale();
@@ -31,11 +29,7 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      if (STUDIO_HOST) {
-        window.location.href = `${STUDIO_HOST}/${locale}/studio`;
-      } else {
-        window.location.href = `/${locale}/studio`;
-      }
+      window.location.href = `/${locale}/studio`;
     }
   }, [user, locale]);
 
@@ -57,7 +51,7 @@ export default function LoginPage() {
           setSubmitting(false);
           return;
         }
-        const { error: err } = await signUp(email, password, displayName || undefined);
+        const { error: err } = await signUp(email, password, displayName || undefined, locale);
         if (err) {
           setError(err.message);
         } else {
@@ -68,11 +62,7 @@ export default function LoginPage() {
         if (err) {
           setError(err.message);
         } else {
-          if (STUDIO_HOST) {
-            window.location.href = `${STUDIO_HOST}/${locale}/studio`;
-          } else {
-            window.location.href = `/${locale}/studio`;
-          }
+          window.location.href = `/${locale}/studio`;
         }
       }
     } finally {

@@ -44,8 +44,8 @@ RESULT_ROOT.mkdir(parents=True, exist_ok=True)
 ALLOWED_ORIGINS = os.getenv(
     "CORS_ORIGINS",
     "http://localhost:5173,http://localhost:5174,http://localhost:3000,"
-    "https://wunplae.com,https://secure.wunplae.com,https://studio.wunplae.com,https://crm.wunplae.com,"
-    "http://wunplae.com,http://secure.wunplae.com,http://studio.wunplae.com,http://crm.wunplae.com"
+    "https://wunplae.com,https://crm.wunplae.com,"
+    "http://wunplae.com,http://crm.wunplae.com"
 ).split(",")
 
 app.add_middleware(
