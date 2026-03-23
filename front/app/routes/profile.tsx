@@ -220,7 +220,7 @@ function ProfileContent() {
             <div className="flex gap-3">
               {!isAdmin && (
                 <button
-                  onClick={() => navigate(lp("/studio/topup"))}
+                  onClick={() => navigate(lp("/subscription"))}
                   className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors"
                 >
                   <Coins className="w-4 h-4" /> {i.topUp}

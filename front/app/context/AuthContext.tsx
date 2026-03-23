@@ -3,13 +3,24 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/utils/supabase";
 import { apiFetch } from "@/utils/api";
 
+interface SubscriptionInfo {
+  tier_id: string;
+  tier_name: string;
+  monthly_tokens: number;
+  billing_cycle: string | null;
+  period_end: string | null;
+  permissions: Record<string, any>;
+}
+
 interface AuthContextValue {
   user: User | null;
   tokenBalance: number;
   isAdmin: boolean;
+  tierId: string;
+  subscription: SubscriptionInfo | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, displayName?: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, displayName?: string, locale?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshBalance: () => Promise<void>;
 }
@@ -20,6 +31,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [tokenBalance, setTokenBalance] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [tierId, setTierId] = useState("free");
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Bootstrap user state from cookie on mount.
@@ -33,15 +46,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser({ id: data.id, email: data.email } as User);
         setTokenBalance(data.token_balance ?? 0);
         setIsAdmin(data.is_admin ?? false);
+        setTierId(data.tier_id ?? "free");
+        setSubscription(data.subscription ?? null);
       } else {
         setUser(null);
         setTokenBalance(0);
         setIsAdmin(false);
+        setTierId("free");
+        setSubscription(null);
       }
     } catch {
       setUser(null);
       setTokenBalance(0);
       setIsAdmin(false);
+      setTierId("free");
+      setSubscription(null);
     } finally {
       setLoading(false);
     }
@@ -57,6 +76,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setTokenBalance(0);
       setIsAdmin(false);
+      setTierId("free");
+      setSubscription(null);
     };
     window.addEventListener("auth:expired", handleExpired);
     return () => window.removeEventListener("auth:expired", handleExpired);
@@ -107,11 +128,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   };
 
-  const signUp = async (email: string, password: string, displayName?: string) => {
+  const signUp = async (email: string, password: string, displayName?: string, locale?: string) => {
+    const redirectLocale = locale || "th";
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { display_name: displayName } },
+      options: {
+        data: { display_name: displayName },
+        emailRedirectTo: `${window.location.origin}/${redirectLocale}/login`,
+      },
     });
     if (error) return { error: error as Error };
 
@@ -148,10 +173,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setTokenBalance(0);
     setIsAdmin(false);
+    setTierId("free");
+    setSubscription(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, tokenBalance, isAdmin, loading, signIn, signUp, signOut, refreshBalance }}>
+    <AuthContext.Provider value={{ user, tokenBalance, isAdmin, tierId, subscription, loading, signIn, signUp, signOut, refreshBalance }}>
       {children}
     </AuthContext.Provider>
   );

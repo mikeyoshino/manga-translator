@@ -70,8 +70,6 @@ services:
         - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
         - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
         - VITE_SENTRY_DSN=${VITE_SENTRY_DSN:-}
-        - VITE_SECURE_HOST=${VITE_SECURE_HOST:-}
-        - VITE_STUDIO_HOST=${VITE_STUDIO_HOST:-}
     expose:
       - "3000"
     environment:

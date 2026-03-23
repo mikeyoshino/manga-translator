@@ -181,8 +181,6 @@ jobs:
             VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
             VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
             VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}
-            VITE_SECURE_HOST=${{ secrets.VITE_SECURE_HOST }}
-            VITE_STUDIO_HOST=${{ secrets.VITE_STUDIO_HOST }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

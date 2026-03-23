@@ -2,18 +2,18 @@ import { Disclosure } from "@headlessui/react";
 import React from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router";
-import { useSecureUrl } from "@/context/LocaleContext";
+import { useLocalePath } from "@/context/LocaleContext";
 
 type Props = {};
 
 export const Header: React.FC<Props> = () => {
   const { user, tokenBalance, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
-  const secureUrl = useSecureUrl();
+  const lp = useLocalePath();
 
   const handleSignOut = async () => {
     await signOut();
-    window.location.href = secureUrl("/login");
+    window.location.href = lp("/login");
   };
 
   return (
@@ -49,7 +49,7 @@ export const Header: React.FC<Props> = () => {
                 </span>
               ) : (
                 <button
-                  onClick={() => navigate("/studio/topup")}
+                  onClick={() => navigate(lp("/subscription"))}
                   className="flex items-center space-x-1 px-3 py-1.5 bg-teal-50 text-teal-700 rounded-full hover:bg-teal-100 transition-colors text-sm font-medium"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
