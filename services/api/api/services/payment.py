@@ -16,6 +16,15 @@ TOKEN_PACKAGES: dict[int, int] = {
     500: 59900,
 }
 
+SUBSCRIPTION_PACKAGES: dict[tuple[str, str], int] = {
+    ("starter", "monthly"): 9900,       # ฿99
+    ("starter", "annual"): 99000,       # ฿990
+    ("pro", "monthly"): 24900,          # ฿249
+    ("pro", "annual"): 249000,          # ฿2,490
+    ("premium", "monthly"): 49000,      # ฿490
+    ("premium", "annual"): 490000,      # ฿4,900
+}
+
 
 def _init_omise():
     if not omise.api_secret:
@@ -90,6 +99,76 @@ def create_card_charge(user_id: str, token_amount: int, card_token: str) -> dict
     }
 
 
+def create_subscription_promptpay_charge(user_id: str, tier_id: str, billing_cycle: str) -> dict[str, Any]:
+    _init_omise()
+    key = (tier_id, billing_cycle)
+    if key not in SUBSCRIPTION_PACKAGES:
+        raise ValueError(f"Invalid subscription: tier={tier_id}, cycle={billing_cycle}")
+
+    amount_satangs = SUBSCRIPTION_PACKAGES[key]
+    source = omise.Source.create(type="promptpay", amount=amount_satangs, currency="thb")
+    charge = omise.Charge.create(
+        amount=amount_satangs, currency="thb", source=source.id,
+        metadata={"user_id": user_id, "tier_id": tier_id, "billing_cycle": billing_cycle, "payment_type": "subscription", "payment_method": "promptpay"},
+    )
+
+    logger.info("Subscription promptpay charge: %s", charge.id)
+
+    qr_code_url = None
+    try:
+        sc = getattr(source, "scannable_code", None)
+        if sc and getattr(sc, "image", None):
+            qr_code_url = sc.image.download_uri
+    except Exception:
+        pass
+    if not qr_code_url:
+        try:
+            sc = getattr(charge, "source", {})
+            if isinstance(sc, dict):
+                sc_code = sc.get("scannable_code", {}) or {}
+                img = sc_code.get("image", {}) or {}
+                qr_code_url = img.get("download_uri")
+            elif hasattr(sc, "scannable_code") and getattr(sc.scannable_code, "image", None):
+                qr_code_url = sc.scannable_code.image.download_uri
+        except Exception:
+            pass
+
+    return {
+        "charge_id": charge.id,
+        "amount_satangs": amount_satangs,
+        "tier_id": tier_id,
+        "billing_cycle": billing_cycle,
+        "qr_code_url": qr_code_url,
+        "authorize_uri": charge.authorize_uri,
+        "status": charge.status,
+    }
+
+
+def create_subscription_card_charge(user_id: str, tier_id: str, billing_cycle: str, card_token: str) -> dict[str, Any]:
+    _init_omise()
+    key = (tier_id, billing_cycle)
+    if key not in SUBSCRIPTION_PACKAGES:
+        raise ValueError(f"Invalid subscription: tier={tier_id}, cycle={billing_cycle}")
+
+    amount_satangs = SUBSCRIPTION_PACKAGES[key]
+    charge = omise.Charge.create(
+        amount=amount_satangs, currency="thb", card=card_token,
+        metadata={"user_id": user_id, "tier_id": tier_id, "billing_cycle": billing_cycle, "payment_type": "subscription", "payment_method": "card"},
+    )
+
+    logger.info("Subscription card charge: %s", charge.id)
+
+    return {
+        "charge_id": charge.id,
+        "amount_satangs": amount_satangs,
+        "tier_id": tier_id,
+        "billing_cycle": billing_cycle,
+        "status": charge.status,
+        "authorize_uri": charge.authorize_uri,
+        "paid": getattr(charge, "paid", False),
+    }
+
+
 def verify_webhook_signature(payload: bytes, signature: str) -> bool:
     secret = os.getenv("OMISE_SECRET_KEY", "")
     if not secret:
@@ -110,5 +189,8 @@ def parse_webhook_event(payload: dict) -> dict[str, Any] | None:
         "user_id": metadata.get("user_id"),
         "tokens_to_credit": metadata.get("tokens_to_credit"),
         "payment_method": metadata.get("payment_method", "unknown"),
+        "payment_type": metadata.get("payment_type", "topup"),
+        "tier_id": metadata.get("tier_id"),
+        "billing_cycle": metadata.get("billing_cycle"),
         "amount_satangs": data.get("amount"),
     }

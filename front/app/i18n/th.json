@@ -420,7 +420,9 @@
     "topUpTitle": "ต้องการโทเค็นเพิ่ม?",
     "topUpDesc": "ซื้อโทเค็นเพิ่มเติมนอกเหนือจากแพ็กเกจของคุณ",
     "features": "ฟีเจอร์",
-    "choosePlan": "เลือกแพ็กเกจของคุณ"
+    "choosePlan": "เลือกแพ็กเกจของคุณ",
+    "subscriptionSuccess": "สมัครสมาชิกสำเร็จ!",
+    "subscriptionActivated": "แพ็กเกจ {tier} ของคุณเปิดใช้งานแล้ว"
   },
   "editor": {
     "back": "กลับ",

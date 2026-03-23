@@ -420,7 +420,9 @@
     "topUpTitle": "Need more tokens?",
     "topUpDesc": "Purchase additional tokens on top of your subscription",
     "features": "Features",
-    "choosePlan": "Choose Your Plan"
+    "choosePlan": "Choose Your Plan",
+    "subscriptionSuccess": "Subscription Activated!",
+    "subscriptionActivated": "Your {tier} plan is now active."
   },
   "editor": {
     "back": "Back",

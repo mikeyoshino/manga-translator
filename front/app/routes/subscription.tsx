@@ -71,6 +71,9 @@ function SubscriptionContent() {
   const [tiersLoading, setTiersLoading] = useState(true);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
 
+  // Selected tier for subscription purchase
+  const [selectedTier, setSelectedTier] = useState<{ id: string; name: string; priceTHB: number } | null>(null);
+
   // Top-up payment flow
   const [step, setStep] = useState<"browse" | "payment" | "processing" | "success">("browse");
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
@@ -124,7 +127,11 @@ function SubscriptionContent() {
         if (res.ok) {
           const data = await res.json();
           if (data.status === "successful" && data.paid) {
-            await refreshBalance();
+            if (selectedTier) {
+              await activateSubscription();
+            } else {
+              await refreshBalance();
+            }
             setPolling(false);
             setStep("success");
             setQrCodeUrl(null);
@@ -139,7 +146,7 @@ function SubscriptionContent() {
     return () => {
       if (pollInterval.current) clearInterval(pollInterval.current);
     };
-  }, [polling, chargeId, refreshBalance]);
+  }, [polling, chargeId, refreshBalance, selectedTier]);
 
   // Detect balance increase as fallback
   useEffect(() => {
@@ -157,6 +164,7 @@ function SubscriptionContent() {
   const resetFlow = () => {
     setStep("browse");
     setSelectedPackage(null);
+    setSelectedTier(null);
     setQrCodeUrl(null);
     setAuthorizeUri(null);
     setPolling(false);
@@ -171,20 +179,32 @@ function SubscriptionContent() {
 
   const selectTopUp = (tokens: number) => {
     setSelectedPackage(tokens);
+    setSelectedTier(null);
+    setStep("payment");
+    setError(null);
+  };
+
+  const selectTier = (tier: { id: string; name: string; priceTHB: number }) => {
+    setSelectedTier(tier);
+    setSelectedPackage(null);
     setStep("payment");
     setError(null);
   };
 
   const createPromptPayCharge = async () => {
-    if (!selectedPackage) return;
+    if (!selectedPackage && !selectedTier) return;
     setError(null);
     setLoading(true);
     setStep("processing");
     try {
-      const res = await apiFetch("/api/payment/create-charge", {
+      const url = selectedTier ? "/api/payment/create-subscription-charge" : "/api/payment/create-charge";
+      const payload = selectedTier
+        ? { tier_id: selectedTier.id, billing_cycle: billingCycle, payment_method: "promptpay" }
+        : { token_amount: selectedPackage, payment_method: "promptpay" };
+      const res = await apiFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token_amount: selectedPackage, payment_method: "promptpay" }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -203,8 +223,22 @@ function SubscriptionContent() {
     }
   };
 
+  const activateSubscription = async () => {
+    if (!selectedTier) return;
+    try {
+      await apiFetch("/api/subscription/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier_id: selectedTier.id, billing_cycle: billingCycle }),
+      });
+    } catch {
+      // Subscription activation via webhook will handle it as fallback
+    }
+    await refreshBalance();
+  };
+
   const createCardCharge = async () => {
-    if (!selectedPackage || !window.Omise) return;
+    if ((!selectedPackage && !selectedTier) || !window.Omise) return;
     setError(null);
     setLoading(true);
 
@@ -231,10 +265,14 @@ function SubscriptionContent() {
 
       setStep("processing");
 
-      const res = await apiFetch("/api/payment/create-charge", {
+      const url = selectedTier ? "/api/payment/create-subscription-charge" : "/api/payment/create-charge";
+      const payload = selectedTier
+        ? { tier_id: selectedTier.id, billing_cycle: billingCycle, payment_method: "card", card_token: token }
+        : { token_amount: selectedPackage, payment_method: "card", card_token: token };
+      const res = await apiFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token_amount: selectedPackage, payment_method: "card", card_token: token }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -244,7 +282,11 @@ function SubscriptionContent() {
       setChargeId(data.charge_id);
 
       if (data.paid) {
-        await refreshBalance();
+        if (selectedTier) {
+          await activateSubscription();
+        } else {
+          await refreshBalance();
+        }
         setStep("success");
       } else if (data.authorize_uri) {
         setAuthorizeUri(data.authorize_uri);
@@ -281,15 +323,24 @@ function SubscriptionContent() {
           <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="w-8 h-8 text-emerald-600" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">{topupT.paymentSuccess}</h2>
-          <p className="text-sm text-slate-500 mb-2">{topupT.tokensCredited}</p>
-          <p className="text-3xl font-bold text-indigo-600 mb-6">{tokenBalance} {topupT.tokens}</p>
+          {selectedTier ? (
+            <>
+              <h2 className="text-2xl font-bold text-slate-800 mb-2">{t.subscriptionSuccess}</h2>
+              <p className="text-sm text-slate-500 mb-6">{t.subscriptionActivated.replace("{tier}", selectedTier.name)}</p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-2xl font-bold text-slate-800 mb-2">{topupT.paymentSuccess}</h2>
+              <p className="text-sm text-slate-500 mb-2">{topupT.tokensCredited}</p>
+              <p className="text-3xl font-bold text-indigo-600 mb-6">{tokenBalance} {topupT.tokens}</p>
+            </>
+          )}
           <div className="flex gap-3 justify-center">
             <button onClick={() => navigate(lp("/studio"))} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors text-sm font-bold shadow-lg shadow-indigo-200">
               {topupT.startTranslating}
             </button>
             <button onClick={resetFlow} className="px-6 py-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors text-sm font-semibold">
-              {topupT.buyMore}
+              {selectedTier ? t.choosePlan : topupT.buyMore}
             </button>
           </div>
         </div>
@@ -346,7 +397,12 @@ function SubscriptionContent() {
   }
 
   // --- Payment method selection ---
-  if (step === "payment" && selectedPkg) {
+  if (step === "payment" && (selectedPkg || selectedTier)) {
+    const displayLabel = selectedTier
+      ? `${selectedTier.name} (${billingCycle === "annual" ? t.annual : t.monthly})`
+      : `${selectedPkg!.tokens} ${topupT.tokens}`;
+    const displayPrice = selectedTier ? selectedTier.priceTHB : selectedPkg!.price;
+
     return (
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-lg mx-auto">
@@ -356,9 +412,9 @@ function SubscriptionContent() {
 
           <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between mb-6">
             <div>
-              <p className="text-sm font-bold text-slate-700">{selectedPkg.tokens} {topupT.tokens}</p>
+              <p className="text-sm font-bold text-slate-700">{displayLabel}</p>
             </div>
-            <p className="text-xl font-bold text-indigo-600">{selectedPkg.price} <span className="text-sm">THB</span></p>
+            <p className="text-xl font-bold text-indigo-600">{displayPrice} <span className="text-sm">THB</span></p>
           </div>
 
           <p className="text-sm font-bold text-slate-600 mb-3">{topupT.choosePayment}</p>
@@ -441,7 +497,7 @@ function SubscriptionContent() {
             {loading ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> {topupT.processing}</>
             ) : (
-              <>{paymentMethod === "card" ? <CreditCard className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />} {topupT.payAmount} {selectedPkg.price} THB</>
+              <>{paymentMethod === "card" ? <CreditCard className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />} {topupT.payAmount} {displayPrice} THB</>
             )}
           </button>
 
@@ -617,6 +673,10 @@ function SubscriptionContent() {
                       </div>
                     ) : (
                       <button
+                        onClick={() => {
+                          const price = billingCycle === "monthly" ? monthlyPriceTHB : annualPriceTHB;
+                          selectTier({ id: tier.id, name: tier.name, priceTHB: price });
+                        }}
                         className={`block w-full py-3 rounded-xl font-semibold text-center transition-all mb-6 ${
                           isPopular
                             ? "bg-white text-indigo-600 hover:bg-slate-50 shadow-sm"
