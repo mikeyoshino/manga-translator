@@ -34,6 +34,7 @@ function EditorContent() {
   const { images, currentImage, undo, redo } = useEditor();
   const navigate = useNavigate();
   const [isClient, setIsClient] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
   const lp = useLocalePath();
   const i = useT().editor;
 
@@ -81,13 +82,22 @@ function EditorContent() {
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 text-slate-900 overflow-hidden">
-      <EditorToolbar />
-      <div className="flex flex-1 min-h-0">
-        <EditorSidebar />
+      <EditorToolbar onTogglePanel={() => setPanelOpen(v => !v)} panelOpen={panelOpen} />
+      <div className="flex flex-1 min-h-0 relative">
+        {/* Sidebar: hidden on phone */}
+        <div className="hidden sm:block">
+          <EditorSidebar />
+        </div>
         <div className="flex-1 min-w-0 bg-slate-200">
           <ClientOnlyCanvas />
         </div>
-        <EditorPropertiesPanel />
+        {/* Properties panel: always visible on lg+, overlay below lg */}
+        <div className={`
+          ${panelOpen ? 'absolute right-0 top-0 bottom-0 z-10 shadow-xl' : 'hidden'}
+          lg:relative lg:block lg:shadow-none
+        `}>
+          <EditorPropertiesPanel />
+        </div>
       </div>
     </div>
   );

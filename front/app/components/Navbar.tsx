@@ -52,7 +52,7 @@ export function Navbar({ showBack = false, showLanguageToggle = false }: NavbarP
   const otherLocalePath = location.pathname.replace(`/${locale}`, `/${otherLocale}`);
 
   return (
-    <header className="h-14 bg-white border-b border-slate-200 px-6 flex items-center justify-between z-30 shrink-0">
+    <header className="h-14 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between z-30 shrink-0">
       <div className="flex items-center gap-3">
         {showBack && (
           <button
@@ -69,7 +69,7 @@ export function Navbar({ showBack = false, showLanguageToggle = false }: NavbarP
           <h1 className="text-lg font-bold tracking-tight text-slate-800">WunPlae</h1>
         </div>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         {showLanguageToggle && (
           <Link
             to={otherLocalePath}
@@ -82,7 +82,7 @@ export function Navbar({ showBack = false, showLanguageToggle = false }: NavbarP
         {isAdmin ? (
           <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-100 rounded-full">
             <Coins className="w-3.5 h-3.5 text-amber-600" />
-            <span className="text-xs font-semibold text-amber-700">{i.adminUnlimited}</span>
+            <span className="hidden sm:inline text-xs font-semibold text-amber-700">{i.adminUnlimited}</span>
           </div>
         ) : (
           <button
@@ -90,10 +90,10 @@ export function Navbar({ showBack = false, showLanguageToggle = false }: NavbarP
             className="flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-full hover:bg-emerald-100 transition-colors"
           >
             <Coins className="w-3.5 h-3.5 text-emerald-600" />
-            <span className="text-xs font-semibold text-emerald-700">{tokenBalance} {i.tokens}</span>
+            <span className="hidden sm:inline text-xs font-semibold text-emerald-700">{tokenBalance} {i.tokens}</span>
           </button>
         )}
-        <div className="h-6 w-px bg-slate-200" />
+        <div className="hidden sm:block h-6 w-px bg-slate-200" />
         <div ref={profileRef} className="relative">
           <button
             onClick={() => setProfileOpen((v) => !v)}
