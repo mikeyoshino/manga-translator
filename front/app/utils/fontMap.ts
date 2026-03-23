@@ -18,6 +18,18 @@ export const defaultFontByLang: Record<string, string> = {
 export const availableFonts = [
   "Kanit",
   "Itim",
+  "Sarabun",
+  "Prompt",
+  "Mitr",
+  "Niramit",
+  "K2D",
+  "Kodchasan",
+  "Krub",
+  "Bai Jamjuree",
+  "Chakra Petch",
+  "Pridi",
+  "Charm",
+  "Chonburi",
 ];
 
 export function getFontForLang(lang: string): string {

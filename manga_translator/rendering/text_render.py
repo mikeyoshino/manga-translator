@@ -225,6 +225,7 @@ LANGUAGE_FONTS = {
     'CHT': os.path.join(BASE_PATH, 'fonts/msyh.ttc'),
 }
 FONT_SELECTION: List[freetype.Face] = []
+_CURRENT_FONT_PATH: str = ''
 font_cache = {}
 def get_cached_font(path: str) -> freetype.Face:
     path = path.replace('\\', '/')
@@ -235,7 +236,8 @@ def get_cached_font(path: str) -> freetype.Face:
     return font_cache[path]
 
 def set_font(font_path: str):
-    global FONT_SELECTION
+    global FONT_SELECTION, _CURRENT_FONT_PATH
+    _CURRENT_FONT_PATH = font_path or ''
     if font_path:
         selection = [font_path] + FALLBACK_FONTS
     else:
@@ -1114,7 +1116,8 @@ def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canva
 # ---------------------------------------------------------------------------
 def _put_text_thai_pillow(font_size: int, text: str, width: int, height: int,
                           alignment: str, fg: Tuple[int, int, int],
-                          bg: Optional[Tuple[int, int, int]], line_spacing_factor: float = 0):
+                          bg: Optional[Tuple[int, int, int]], line_spacing_factor: float = 0,
+                          font_path: str = ''):
     """Render Thai text using Pillow which handles complex script shaping."""
     from PIL import Image, ImageDraw, ImageFont
 
@@ -1126,10 +1129,10 @@ def _put_text_thai_pillow(font_size: int, text: str, width: int, height: int,
     if not text or not text.strip():
         return None
 
-    # Load font
-    font_path = LANGUAGE_FONTS.get('THA', FALLBACK_FONTS[0])
+    # Load font: explicit font_path → module-level _CURRENT_FONT_PATH → LANGUAGE_FONTS fallback
+    resolved_font = font_path or _CURRENT_FONT_PATH or LANGUAGE_FONTS.get('THA', FALLBACK_FONTS[0])
     try:
-        pil_font = ImageFont.truetype(font_path, font_size)
+        pil_font = ImageFont.truetype(resolved_font, font_size)
     except Exception:
         pil_font = ImageFont.truetype(FALLBACK_FONTS[0], font_size)
 
@@ -1239,7 +1242,7 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
 
     # Use Pillow-based renderer for Thai (proper combining mark handling)
     if lang and (lang.upper().startswith('TH') or lang.upper() == 'THA'):
-        result = _put_text_thai_pillow(font_size, text, width, height, alignment, fg, bg, line_spacing)
+        result = _put_text_thai_pillow(font_size, text, width, height, alignment, fg, bg, line_spacing, font_path=_CURRENT_FONT_PATH)
         if result is not None:
             return result
     bg_size = int(max(font_size * 0.07, 1)) if bg is not None else 0
