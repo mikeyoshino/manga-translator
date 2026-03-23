@@ -43,8 +43,6 @@ DEFAULT_FREE_PERMISSIONS: dict[str, Any] = {
     "editor.text_border": False,
     "editor.bulk_export_zip": False,
     "editor.upscaling": False,
-    "translator.gpt4o": False,
-    "translator.claude": False,
 }
 
 
@@ -228,6 +226,10 @@ def subscribe(
             channel="system",
         )
 
+    # Invalidate in-process tier cache so feature checks pick up the new tier
+    from api.services.feature_guard import invalidate_user_tier_cache
+    invalidate_user_tier_cache(user_id)
+
     logger.info(
         "User %s subscribed to %s (%s), credited %d tokens",
         user_id, tier_id, billing_cycle, monthly_tokens,
@@ -331,6 +333,10 @@ def _downgrade_to_free(user_id: str) -> dict:
     }).eq("user_id", user_id).execute()
 
     client.table("profiles").update({"tier_id": "free"}).eq("id", user_id).execute()
+
+    # Invalidate in-process tier cache so feature checks pick up the downgrade
+    from api.services.feature_guard import invalidate_user_tier_cache
+    invalidate_user_tier_cache(user_id)
 
     logger.info("User %s downgraded to free tier", user_id)
     return {"tier_id": "free", "status": "active"}

@@ -1,6 +1,7 @@
 import { useEditor } from "@/context/EditorContext";
 import { availableFonts } from "@/utils/fontMap";
 import { useT } from "@/context/LocaleContext";
+import { useHasFeature } from "@/context/AuthContext";
 
 function InfoTooltip({ text }: { text: string }) {
   return (
@@ -159,6 +160,7 @@ function DrawingToolsPanel() {
 function BlockPropertiesPanel() {
   const { currentImage, selectedBlockId, updateBlock } = useEditor();
   const i = useT().editor;
+  const hasTextBorder = useHasFeature("editor.text_border");
 
   if (!currentImage || !selectedBlockId) {
     return (
@@ -292,39 +294,43 @@ function BlockPropertiesPanel() {
       </div>
 
       {/* Text border / stroke */}
-      <label className="block text-xs font-semibold text-slate-500 mb-1">{i.textBorder} <InfoTooltip text={i.hintTextBorder} /></label>
-      <div className="flex items-center gap-2 mb-2">
-        <button
-          onClick={() => update({ editedStrokeEnabled: !block.editedStrokeEnabled })}
-          className={`px-2 py-1 text-xs rounded-lg transition-colors font-semibold ${
-            block.editedStrokeEnabled
-              ? "bg-indigo-600 text-white"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-          }`}
-        >
-          {block.editedStrokeEnabled ? i.on : i.off}
-        </button>
-        {block.editedStrokeEnabled && (
-          <>
-            <input
-              type="color"
-              value={block.editedStrokeColor}
-              onChange={(e) => update({ editedStrokeColor: e.target.value })}
-              className="w-8 h-7 rounded-lg cursor-pointer bg-transparent border border-slate-200"
-            />
-            <input
-              type="number"
-              value={block.editedStrokeWidth}
-              min={0.5}
-              max={20}
-              step={0.5}
-              onChange={(e) => update({ editedStrokeWidth: Number(e.target.value) })}
-              className="w-16 bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-lg p-1 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-              title="Stroke width"
-            />
-          </>
-        )}
-      </div>
+      {hasTextBorder && (
+        <>
+          <label className="block text-xs font-semibold text-slate-500 mb-1">{i.textBorder} <InfoTooltip text={i.hintTextBorder} /></label>
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              onClick={() => update({ editedStrokeEnabled: !block.editedStrokeEnabled })}
+              className={`px-2 py-1 text-xs rounded-lg transition-colors font-semibold ${
+                block.editedStrokeEnabled
+                  ? "bg-indigo-600 text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {block.editedStrokeEnabled ? i.on : i.off}
+            </button>
+            {block.editedStrokeEnabled && (
+              <>
+                <input
+                  type="color"
+                  value={block.editedStrokeColor}
+                  onChange={(e) => update({ editedStrokeColor: e.target.value })}
+                  className="w-8 h-7 rounded-lg cursor-pointer bg-transparent border border-slate-200"
+                />
+                <input
+                  type="number"
+                  value={block.editedStrokeWidth}
+                  min={0.5}
+                  max={20}
+                  step={0.5}
+                  onChange={(e) => update({ editedStrokeWidth: Number(e.target.value) })}
+                  className="w-16 bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-lg p-1 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                  title="Stroke width"
+                />
+              </>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Letter spacing */}
       <label className="block text-xs font-semibold text-slate-500 mb-1">{i.letterSpacing} <InfoTooltip text={i.hintLetterSpacing} /></label>
@@ -666,16 +672,19 @@ function CloneStampPanel() {
 
 export function EditorPropertiesPanel() {
   const { activeTool } = useEditor();
+  const hasMagicRemover = useHasFeature("editor.magic_remover");
+  const hasManualTranslate = useHasFeature("editor.manual_translate");
+  const hasCloneStamp = useHasFeature("editor.clone_stamp");
 
-  if (activeTool === "cloneStamp") {
+  if (activeTool === "cloneStamp" && hasCloneStamp) {
     return <CloneStampPanel />;
   }
 
-  if (activeTool === "manualTranslate") {
+  if (activeTool === "manualTranslate" && hasManualTranslate) {
     return <ManualTranslatePanel />;
   }
 
-  if (activeTool === "magicRemover") {
+  if (activeTool === "magicRemover" && hasMagicRemover) {
     return <MagicRemoverPanel />;
   }
 

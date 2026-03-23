@@ -78,8 +78,7 @@
             "1 project (7-day expiry)",
             "Basic text editing",
             "Pen & eraser tools",
-            "Single image export",
-            "gpt-4o-mini translator"
+            "Single image export"
           ]
         },
         {
@@ -96,8 +95,7 @@
             "Basic text editing",
             "Pen & eraser tools",
             "Single image export",
-            "Batch translate up to 5 images",
-            "gpt-4o-mini translator"
+            "Batch translate up to 5 images"
           ]
         },
         {
@@ -117,8 +115,7 @@
             "Manual Translate (re-translate regions)",
             "Text Border/Stroke styling",
             "Bulk export as ZIP",
-            "Batch translate up to 20 images",
-            "gpt-4o-mini + gpt-4o models"
+            "Batch translate up to 20 images"
           ]
         },
         {
@@ -134,8 +131,6 @@
             "Unlimited projects (60-day expiry)",
             "Everything in Pro, plus:",
             "Image Upscaling (HD output)",
-            "Claude translator model",
-            "Future AI features (exclusive)",
             "Batch translate up to 50 images"
           ]
         }

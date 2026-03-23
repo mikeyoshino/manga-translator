@@ -4,6 +4,7 @@ import { exportSingleImage, exportAllAsZip } from "@/utils/exportZip";
 import { useCallback } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Download, FolderArchive, Pencil, Eraser, Undo2, Redo2, Sparkles, ScanSearch, Stamp, PanelRightOpen } from "lucide-react";
 import { useT, useLocalePath } from "@/context/LocaleContext";
+import { useHasFeature } from "@/context/AuthContext";
 
 interface EditorToolbarProps {
   onTogglePanel?: () => void;
@@ -22,6 +23,10 @@ export function EditorToolbar({ onTogglePanel, panelOpen }: EditorToolbarProps) 
   const navigate = useNavigate();
   const lp = useLocalePath();
   const i = useT().editor;
+  const hasMagicRemover = useHasFeature("editor.magic_remover");
+  const hasManualTranslate = useHasFeature("editor.manual_translate");
+  const hasCloneStamp = useHasFeature("editor.clone_stamp");
+  const hasBulkExportZip = useHasFeature("editor.bulk_export_zip");
 
   const handleBack = () => navigate(lp("/studio"));
 
@@ -130,39 +135,45 @@ export function EditorToolbar({ onTogglePanel, panelOpen }: EditorToolbarProps) 
         >
           <Eraser className="w-4 h-4" />
         </button>
-        <button
-          onClick={() => handleToolClick("magicRemover")}
-          title={i.magicRemover}
-          className={`p-1.5 rounded-lg transition-colors ${
-            activeTool === "magicRemover"
-              ? "bg-indigo-600 text-white"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-          }`}
-        >
-          <Sparkles className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => handleToolClick("manualTranslate")}
-          title={i.manualTranslate}
-          className={`p-1.5 rounded-lg transition-colors ${
-            activeTool === "manualTranslate"
-              ? "bg-indigo-600 text-white"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-          }`}
-        >
-          <ScanSearch className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => handleToolClick("cloneStamp")}
-          title={i.cloneStamp}
-          className={`p-1.5 rounded-lg transition-colors ${
-            activeTool === "cloneStamp"
-              ? "bg-indigo-600 text-white"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-          }`}
-        >
-          <Stamp className="w-4 h-4" />
-        </button>
+        {hasMagicRemover && (
+          <button
+            onClick={() => handleToolClick("magicRemover")}
+            title={i.magicRemover}
+            className={`p-1.5 rounded-lg transition-colors ${
+              activeTool === "magicRemover"
+                ? "bg-indigo-600 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+          </button>
+        )}
+        {hasManualTranslate && (
+          <button
+            onClick={() => handleToolClick("manualTranslate")}
+            title={i.manualTranslate}
+            className={`p-1.5 rounded-lg transition-colors ${
+              activeTool === "manualTranslate"
+                ? "bg-indigo-600 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <ScanSearch className="w-4 h-4" />
+          </button>
+        )}
+        {hasCloneStamp && (
+          <button
+            onClick={() => handleToolClick("cloneStamp")}
+            title={i.cloneStamp}
+            className={`p-1.5 rounded-lg transition-colors ${
+              activeTool === "cloneStamp"
+                ? "bg-indigo-600 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Stamp className="w-4 h-4" />
+          </button>
+        )}
         {isDrawing && (activeTool === "magicRemover" ? currentMagicLines.length > 0 : activeTool === "cloneStamp" ? currentCloneStrokes.length > 0 : currentLines.length > 0) && (
           <button
             onClick={() => {
@@ -213,12 +224,14 @@ export function EditorToolbar({ onTogglePanel, panelOpen }: EditorToolbarProps) 
         >
           <Download className="w-3.5 h-3.5" /> <span className="hidden md:inline">{i.exportImage}</span>
         </button>
-        <button
-          onClick={handleExportAll}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 rounded-lg transition-colors"
-        >
-          <FolderArchive className="w-3.5 h-3.5" /> <span className="hidden md:inline">{i.exportAll}</span>
-        </button>
+        {hasBulkExportZip && (
+          <button
+            onClick={handleExportAll}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 rounded-lg transition-colors"
+          >
+            <FolderArchive className="w-3.5 h-3.5" /> <span className="hidden md:inline">{i.exportAll}</span>
+          </button>
+        )}
       </div>
     </div>
   );
