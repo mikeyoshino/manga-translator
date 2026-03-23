@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link, useLocation } from "react-router";
 import {
   BookOpen,
-  ArrowLeft,
   Languages,
   Coins,
   User,
@@ -16,13 +15,11 @@ import { useLocale, useLocalePath, useT } from "@/context/LocaleContext";
 
 
 interface NavbarProps {
-  /** Show back button that navigates to home */
-  showBack?: boolean;
   /** Show language toggle (only on home page) */
   showLanguageToggle?: boolean;
 }
 
-export function Navbar({ showBack = false, showLanguageToggle = false }: NavbarProps) {
+export function Navbar({ showLanguageToggle = false }: NavbarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, tokenBalance, isAdmin, signOut } = useAuth();
@@ -52,22 +49,12 @@ export function Navbar({ showBack = false, showLanguageToggle = false }: NavbarP
 
   return (
     <header className="h-14 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between z-30 shrink-0">
-      <div className="flex items-center gap-3">
-        {showBack && (
-          <button
-            onClick={() => navigate(lp("/studio"))}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> {i.back}
-          </button>
-        )}
-        <div className="flex items-center gap-3">
-          <div className="bg-indigo-600 p-1.5 rounded-lg">
-            <BookOpen className="text-white w-5 h-5" />
-          </div>
-          <h1 className="text-lg font-bold tracking-tight text-slate-800">WunPlae</h1>
+      <Link to={lp("/studio")} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        <div className="bg-indigo-600 p-1.5 rounded-lg">
+          <BookOpen className="text-white w-5 h-5" />
         </div>
-      </div>
+        <h1 className="text-lg font-bold tracking-tight text-slate-800">WunPlae</h1>
+      </Link>
       <div className="flex items-center gap-2 sm:gap-4">
         {showLanguageToggle && (
           <Link
