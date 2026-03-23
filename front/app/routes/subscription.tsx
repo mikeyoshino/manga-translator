@@ -26,10 +26,13 @@ type PaymentMethod = "promptpay" | "card";
 interface TierDef {
   id: string;
   name: string;
-  monthly_price: number;
-  annual_price: number;
+  price_satangs: number;
+  annual_price_satangs: number;
   monthly_tokens: number;
-  features: string[];
+  max_projects: number;
+  project_expiry_days: number;
+  batch_limit: number;
+  features: Record<string, boolean>;
 }
 
 const TOPUP_PACKAGES = [
@@ -61,6 +64,7 @@ function SubscriptionContent() {
   const lp = useLocalePath();
   const t = useT().subscription;
   const topupT = useT().topup;
+  const landingTiers = useT().landing.pricing.tiers;
 
   // Subscription tiers from API
   const [tiers, setTiers] = useState<TierDef[]>([]);
@@ -534,16 +538,19 @@ function SubscriptionContent() {
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {tiers.map((tier) => {
+              {tiers.map((tier, tierIndex) => {
                 const isCurrent = tier.id === currentTierId;
                 const isPopular = tier.id === "pro";
                 const thisTierIdx = TIER_ORDER.indexOf(tier.id);
                 const isUpgrade = thisTierIdx > tierIdx;
-                const monthlyPrice = billingCycle === "monthly"
-                  ? tier.monthly_price
-                  : Math.round((tier.annual_price / 12) * 10) / 10;
-                const annualTotal = tier.annual_price;
+                const monthlyPriceTHB = tier.price_satangs / 100;
+                const annualPriceTHB = tier.annual_price_satangs / 100;
+                const displayPrice = billingCycle === "monthly"
+                  ? monthlyPriceTHB
+                  : Math.round((annualPriceTHB / 12) * 10) / 10;
                 const imagesCount = Math.floor(tier.monthly_tokens / 10);
+                // Use i18n feature lists for display (API features is a permission flags object)
+                const displayFeatures: string[] = landingTiers[tierIndex]?.features ?? [];
 
                 return (
                   <div
@@ -574,20 +581,20 @@ function SubscriptionContent() {
                     {/* Price */}
                     <div className="mb-1">
                       <span className="text-3xl font-bold">
-                        {tier.monthly_price === 0 ? "\u0E3F0" : `\u0E3F${monthlyPrice}`}
+                        {monthlyPriceTHB === 0 ? "\u0E3F0" : `\u0E3F${displayPrice}`}
                       </span>
-                      {tier.monthly_price > 0 && (
+                      {monthlyPriceTHB > 0 && (
                         <span className={`text-sm ${isPopular ? "text-indigo-200" : "text-slate-400"}`}>
                           {t.perMonth}
                         </span>
                       )}
                     </div>
-                    {billingCycle === "annual" && annualTotal > 0 && (
+                    {billingCycle === "annual" && annualPriceTHB > 0 && (
                       <p className={`text-xs mb-3 ${isPopular ? "text-indigo-200" : "text-slate-400"}`}>
-                        {"\u0E3F"}{annualTotal.toLocaleString()}{t.perYear}
+                        {"\u0E3F"}{annualPriceTHB.toLocaleString()}{t.perYear}
                       </p>
                     )}
-                    {(billingCycle === "monthly" || annualTotal === 0) && <div className="mb-3" />}
+                    {(billingCycle === "monthly" || annualPriceTHB === 0) && <div className="mb-3" />}
 
                     {/* Tokens */}
                     <div className={`text-sm font-medium mb-5 ${isPopular ? "text-indigo-100" : "text-slate-600"}`}>
@@ -604,7 +611,7 @@ function SubscriptionContent() {
                       }`}>
                         {t.currentBadge}
                       </div>
-                    ) : tier.monthly_price === 0 ? (
+                    ) : monthlyPriceTHB === 0 ? (
                       <div className="block w-full py-3 rounded-xl font-semibold text-center mb-6 bg-slate-100 text-slate-500">
                         {t.getStarted}
                       </div>
@@ -622,7 +629,7 @@ function SubscriptionContent() {
 
                     {/* Features */}
                     <ul className="space-y-2.5 flex-1">
-                      {tier.features.map((feature, fIdx) => (
+                      {displayFeatures.map((feature, fIdx) => (
                         <li key={fIdx} className="flex items-start gap-2 text-sm">
                           <Check className={`w-4 h-4 flex-shrink-0 mt-0.5 ${isPopular ? "text-indigo-200" : "text-indigo-400"}`} />
                           <span className={isPopular ? "text-indigo-50" : "text-slate-600"}>
