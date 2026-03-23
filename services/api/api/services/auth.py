@@ -167,13 +167,17 @@ async def signout_session(response: Response):
 
 async def get_me(request: Request, user: AuthUser = Depends(get_current_user)):
     import manga_shared.supabase_client as sb
+    from api.services.subscription import get_user_subscription_summary
     profile = sb.get_user_profile(user.id)
+    subscription = get_user_subscription_summary(user.id)
     return {
         "id": user.id,
         "email": user.email,
         "is_admin": user.is_admin,
         "token_balance": profile.get("token_balance", 0),
         "display_name": profile.get("display_name", ""),
+        "tier_id": profile.get("tier_id", "free"),
+        "subscription": subscription,
     }
 
 

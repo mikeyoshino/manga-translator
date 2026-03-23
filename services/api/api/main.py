@@ -26,7 +26,7 @@ from api.middleware.logging import RequestLoggingMiddleware
 from api.services.auth import AuthUser, get_current_user
 import manga_shared.supabase_client as sb
 
-from api.routes import health, auth, translate, payment, projects, admin
+from api.routes import health, auth, translate, payment, projects, admin, subscription
 
 app = FastAPI()
 app.add_middleware(AuthCookieMiddleware)
@@ -58,6 +58,7 @@ app.include_router(translate.router)
 app.include_router(payment.router)
 app.include_router(projects.router)
 app.include_router(admin.router)
+app.include_router(subscription.router)
 
 
 # Static files for result directory
@@ -93,8 +94,10 @@ async def _shutdown():
 
 @app.get("/user/profile", tags=["user"])
 async def user_profile(user: AuthUser = Depends(get_current_user)):
+    from api.services.subscription import get_user_subscription_summary
     profile = sb.get_user_profile(user.id)
     profile["is_admin"] = user.is_admin
+    profile["subscription"] = get_user_subscription_summary(user.id)
     return profile
 
 
