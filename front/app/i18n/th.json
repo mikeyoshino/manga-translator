@@ -55,16 +55,91 @@
       ]
     },
     "pricing": {
-      "title": "ราคาที่เข้าใจง่าย",
-      "subtitle": "เลือกแพ็กเกจที่เหมาะกับคุณ ชำระเงินง่ายผ่าน PromptPay หรือบัตรเครดิต โทเคนเข้าทันที",
-      "free": "สมัครสมาชิกรับฟรี 5 โทเคน (1 โทเคน = 1 รูป)",
+      "title": "เลือกแพ็กเกจที่เหมาะกับคุณ",
+      "subtitle": "เริ่มต้นใช้งานฟรี อัปเกรดเมื่อต้องการเครื่องมือและโทเคนเพิ่ม",
+      "monthly": "รายเดือน",
+      "annual": "รายปี",
+      "annualSave": "ประหยัด 2 เดือน",
+      "perMonth": "/เดือน",
+      "perYear": "/ปี",
+      "mostPopular": "ยอดนิยม",
+      "tokensPerMonth": "โทเคน/เดือน",
+      "images": "รูป",
       "tiers": [
-        { "name": "Starter", "price": "฿99", "tokens": "50 รูป", "popular": false },
-        { "name": "Popular", "price": "฿299", "tokens": "200 รูป", "popular": true },
-        { "name": "Best Value", "price": "฿599", "tokens": "500 รูป", "popular": false }
-      ],
-      "choosePlan": "เลือกแพ็กเกจนี้",
-      "mostPopular": "ยอดนิยม"
+        {
+          "name": "Free",
+          "monthlyPrice": "฿0",
+          "annualPrice": "฿0",
+          "tokens": "50",
+          "imageCount": "5",
+          "cta": "เริ่มต้นใช้งานฟรี",
+          "popular": false,
+          "features": [
+            "1 โปรเจกต์ (หมดอายุ 7 วัน)",
+            "แก้ไขข้อความพื้นฐาน",
+            "ปากกาและยางลบ",
+            "ส่งออกรูปเดี่ยว",
+            "โมเดล gpt-4o-mini"
+          ]
+        },
+        {
+          "name": "Starter",
+          "monthlyPrice": "฿99",
+          "annualPrice": "฿990",
+          "annualMonthly": "฿82.5",
+          "tokens": "500",
+          "imageCount": "50",
+          "cta": "สมัครสมาชิก",
+          "popular": false,
+          "features": [
+            "3 โปรเจกต์ (หมดอายุ 14 วัน)",
+            "แก้ไขข้อความพื้นฐาน",
+            "ปากกาและยางลบ",
+            "ส่งออกรูปเดี่ยว",
+            "แปลพร้อมกันสูงสุด 5 รูป",
+            "โมเดล gpt-4o-mini"
+          ]
+        },
+        {
+          "name": "Pro",
+          "monthlyPrice": "฿249",
+          "annualPrice": "฿2,490",
+          "annualMonthly": "฿207.5",
+          "tokens": "2,000",
+          "imageCount": "200",
+          "cta": "สมัครสมาชิก",
+          "popular": true,
+          "features": [
+            "10 โปรเจกต์ (หมดอายุ 30 วัน)",
+            "ทุกอย่างใน Starter รวมถึง:",
+            "Magic Remover (AI ลบข้อความ)",
+            "Clone Stamp (ซ่อมพื้นหลัง)",
+            "Manual Translate (แปลเฉพาะจุด)",
+            "เส้นขอบข้อความ (Text Border)",
+            "ส่งออก ZIP ทั้งหมด",
+            "แปลพร้อมกันสูงสุด 20 รูป",
+            "โมเดล gpt-4o-mini + gpt-4o"
+          ]
+        },
+        {
+          "name": "Premium",
+          "monthlyPrice": "฿490",
+          "annualPrice": "฿4,900",
+          "annualMonthly": "฿408",
+          "tokens": "5,000",
+          "imageCount": "500",
+          "cta": "สมัครสมาชิก",
+          "popular": false,
+          "features": [
+            "โปรเจกต์ไม่จำกัด (หมดอายุ 60 วัน)",
+            "ทุกอย่างใน Pro รวมถึง:",
+            "Image Upscaling (ภาพ HD)",
+            "โมเดล Claude",
+            "ฟีเจอร์ AI ใหม่ในอนาคต",
+            "แปลพร้อมกันสูงสุด 50 รูป"
+          ]
+        }
+      ]
     },
     "trust": {
       "title": "ความน่าเชื่อถือและความปลอดภัย",

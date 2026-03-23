@@ -27,6 +27,7 @@ import {
   ArrowRight,
   Image as ImageIcon,
   Edit3,
+  Check,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -85,6 +86,7 @@ export default function LandingPage() {
   const loginUrl = useSecureUrl();
   const otherLocale = lang === "th" ? "en" : "th";
   const [sliderPosition, setSliderPosition] = useState(50);
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const t = useT().landing;
 
   const handleMove = (e: React.MouseEvent<HTMLDivElement> | React.Touch) => {
@@ -401,19 +403,42 @@ export default function LandingPage() {
             <p className="text-slate-400 max-w-2xl mx-auto text-lg">
               {t.pricing.subtitle}
             </p>
-            <div className="mt-8 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 text-white font-medium text-sm backdrop-blur-sm border border-white/10">
-              <Sparkles className="w-4 h-4 text-indigo-400" />
-              {t.pricing.free}
+
+            {/* Monthly / Annual Toggle */}
+            <div className="mt-8 inline-flex items-center bg-slate-800 rounded-full p-1 border border-slate-700">
+              <button
+                onClick={() => setBillingCycle("monthly")}
+                className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
+                  billingCycle === "monthly"
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                {t.pricing.monthly}
+              </button>
+              <button
+                onClick={() => setBillingCycle("annual")}
+                className={`px-5 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
+                  billingCycle === "annual"
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                {t.pricing.annual}
+                <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-semibold">
+                  {t.pricing.annualSave}
+                </span>
+              </button>
             </div>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
             {t.pricing.tiers.map((tier, idx) => (
               <div
                 key={idx}
-                className={`relative p-8 rounded-3xl transition-transform ${
+                className={`relative flex flex-col p-7 rounded-3xl transition-transform ${
                   tier.popular
-                    ? "bg-indigo-600 transform md:-translate-y-4 shadow-xl shadow-indigo-900/50"
+                    ? "bg-indigo-600 transform lg:-translate-y-4 shadow-xl shadow-indigo-900/50 ring-2 ring-indigo-400"
                     : "bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm hover:bg-slate-800"
                 }`}
               >
@@ -422,27 +447,64 @@ export default function LandingPage() {
                     {t.pricing.mostPopular}
                   </div>
                 )}
-                <h3 className="text-xl font-medium text-white/80 mb-2">
+
+                <h3 className="text-lg font-semibold text-white mb-1">
                   {tier.name}
                 </h3>
-                <div className="flex items-baseline gap-2 mb-8">
-                  <span className="text-4xl font-bold">{tier.price}</span>
-                  <span
-                    className={`text-sm ${tier.popular ? "text-indigo-200" : "text-slate-400"}`}
-                  >
-                    / {tier.tokens}
+
+                {/* Price */}
+                <div className="mb-1">
+                  <span className="text-3xl font-bold">
+                    {billingCycle === "monthly"
+                      ? tier.monthlyPrice
+                      : (tier.annualMonthly ?? tier.monthlyPrice)}
+                  </span>
+                  {tier.monthlyPrice !== "฿0" && (
+                    <span className={`text-sm ${tier.popular ? "text-indigo-200" : "text-slate-400"}`}>
+                      {t.pricing.perMonth}
+                    </span>
+                  )}
+                </div>
+                {billingCycle === "annual" && tier.annualPrice !== "฿0" && (
+                  <p className={`text-xs mb-3 ${tier.popular ? "text-indigo-200" : "text-slate-400"}`}>
+                    {tier.annualPrice}{t.pricing.perYear}
+                  </p>
+                )}
+                {(billingCycle === "monthly" || tier.annualPrice === "฿0") && (
+                  <div className="mb-3" />
+                )}
+
+                {/* Tokens */}
+                <div className={`text-sm font-medium mb-5 ${tier.popular ? "text-indigo-100" : "text-slate-300"}`}>
+                  {tier.tokens} {t.pricing.tokensPerMonth}
+                  <span className={`block text-xs ${tier.popular ? "text-indigo-200" : "text-slate-400"}`}>
+                    ({tier.imageCount} {t.pricing.images})
                   </span>
                 </div>
+
+                {/* CTA */}
                 <a
                   href={loginUrl("/login")}
-                  className={`block w-full py-3.5 rounded-xl font-semibold text-center transition-all ${
+                  className={`block w-full py-3 rounded-xl font-semibold text-center transition-all mb-6 ${
                     tier.popular
                       ? "bg-white text-indigo-600 hover:bg-slate-50 shadow-sm"
                       : "bg-white/10 text-white hover:bg-white/20"
                   }`}
                 >
-                  {t.pricing.choosePlan}
+                  {tier.cta}
                 </a>
+
+                {/* Features */}
+                <ul className="space-y-2.5 flex-1">
+                  {tier.features.map((feature, fIdx) => (
+                    <li key={fIdx} className="flex items-start gap-2 text-sm">
+                      <Check className={`w-4 h-4 flex-shrink-0 mt-0.5 ${tier.popular ? "text-indigo-200" : "text-indigo-400"}`} />
+                      <span className={tier.popular ? "text-indigo-50" : "text-slate-300"}>
+                        {feature}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>

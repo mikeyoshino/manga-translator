@@ -55,16 +55,91 @@
       ]
     },
     "pricing": {
-      "title": "Simple Pricing",
-      "subtitle": "Pay via PromptPay QR or Credit/Debit Card. Tokens credited instantly.",
-      "free": "5 Free Tokens on signup (1 token = 1 image)",
+      "title": "Choose the Right Plan for You",
+      "subtitle": "Start free, upgrade when you need more tools and tokens.",
+      "monthly": "Monthly",
+      "annual": "Annual",
+      "annualSave": "Save 2 months",
+      "perMonth": "/mo",
+      "perYear": "/yr",
+      "mostPopular": "Most Popular",
+      "tokensPerMonth": "tokens/mo",
+      "images": "images",
       "tiers": [
-        { "name": "Starter", "price": "฿99", "tokens": "50 images", "popular": false },
-        { "name": "Popular", "price": "฿299", "tokens": "200 images", "popular": true },
-        { "name": "Best Value", "price": "฿599", "tokens": "500 images", "popular": false }
-      ],
-      "choosePlan": "Choose Plan",
-      "mostPopular": "Most Popular"
+        {
+          "name": "Free",
+          "monthlyPrice": "฿0",
+          "annualPrice": "฿0",
+          "tokens": "50",
+          "imageCount": "5",
+          "cta": "Get Started Free",
+          "popular": false,
+          "features": [
+            "1 project (7-day expiry)",
+            "Basic text editing",
+            "Pen & eraser tools",
+            "Single image export",
+            "gpt-4o-mini translator"
+          ]
+        },
+        {
+          "name": "Starter",
+          "monthlyPrice": "฿99",
+          "annualPrice": "฿990",
+          "annualMonthly": "฿82.5",
+          "tokens": "500",
+          "imageCount": "50",
+          "cta": "Subscribe",
+          "popular": false,
+          "features": [
+            "3 projects (14-day expiry)",
+            "Basic text editing",
+            "Pen & eraser tools",
+            "Single image export",
+            "Batch translate up to 5 images",
+            "gpt-4o-mini translator"
+          ]
+        },
+        {
+          "name": "Pro",
+          "monthlyPrice": "฿249",
+          "annualPrice": "฿2,490",
+          "annualMonthly": "฿207.5",
+          "tokens": "2,000",
+          "imageCount": "200",
+          "cta": "Subscribe",
+          "popular": true,
+          "features": [
+            "10 projects (30-day expiry)",
+            "Everything in Starter, plus:",
+            "Magic Remover (AI text removal)",
+            "Clone Stamp (background repair)",
+            "Manual Translate (re-translate regions)",
+            "Text Border/Stroke styling",
+            "Bulk export as ZIP",
+            "Batch translate up to 20 images",
+            "gpt-4o-mini + gpt-4o models"
+          ]
+        },
+        {
+          "name": "Premium",
+          "monthlyPrice": "฿490",
+          "annualPrice": "฿4,900",
+          "annualMonthly": "฿408",
+          "tokens": "5,000",
+          "imageCount": "500",
+          "cta": "Subscribe",
+          "popular": false,
+          "features": [
+            "Unlimited projects (60-day expiry)",
+            "Everything in Pro, plus:",
+            "Image Upscaling (HD output)",
+            "Claude translator model",
+            "Future AI features (exclusive)",
+            "Batch translate up to 50 images"
+          ]
+        }
+      ]
     },
     "trust": {
       "title": "Trust & Security",

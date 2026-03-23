@@ -12,12 +12,17 @@ erDiagram
     profiles ||--o{ token_transactions : "has many"
     profiles ||--o{ payments : "has many"
     profiles ||--o{ projects : "has many"
+    profiles ||--|| subscriptions : "has one"
     projects ||--o{ project_images : "has many"
+    subscription_tiers ||--o{ subscriptions : "has many"
+    subscription_tiers ||--o{ profiles : "tier lookup"
+    subscriptions ||--o{ subscription_payments : "has many"
 
     profiles {
         uuid id PK "references auth.users(id)"
         text display_name
         int token_balance "CHECK >= 0"
+        text tier_id FK "references subscription_tiers(id)"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -66,6 +71,49 @@ erDiagram
         text status "uploaded | translating | translated | error"
         timestamptz created_at
         timestamptz updated_at
+    }
+
+    subscription_tiers {
+        text id PK "free | starter | pro | premium"
+        text name
+        int price_satangs "monthly price"
+        int annual_price_satangs
+        int monthly_tokens
+        int token_cost_per_image "default 10"
+        int max_projects
+        int project_expiry_days
+        int max_rollover
+        int batch_limit
+        jsonb features "permission flags"
+    }
+
+    subscriptions {
+        bigint id PK
+        uuid user_id FK UK "references profiles(id)"
+        text tier_id FK "references subscription_tiers(id)"
+        text billing_cycle "monthly | annual"
+        text status "active | cancelled | past_due | expired"
+        timestamptz current_period_start
+        timestamptz current_period_end
+        timestamptz tokens_refreshed_at
+        int rollover_tokens
+        text omise_schedule_id
+        text omise_customer_id
+        boolean cancel_at_period_end
+    }
+
+    subscription_payments {
+        bigint id PK
+        uuid user_id FK "references profiles(id)"
+        bigint subscription_id FK "references subscriptions(id)"
+        text omise_charge_id UK
+        text tier_id FK
+        text billing_cycle
+        int amount_satangs
+        int tokens_credited
+        text status "pending | successful | failed | refunded"
+        timestamptz period_start
+        timestamptz period_end
     }
 ```
 
@@ -389,10 +437,30 @@ Adds tokens to a user's balance. Called when a payment succeeds or tokens need t
 Fires automatically when someone signs up (`AFTER INSERT ON auth.users`). The user never calls this — Supabase Auth triggers it.
 
 **What it does:**
-1. Creates a `profiles` row — copies the user ID, extracts display_name from email (e.g., `john@gmail.com` → `john`)
+1. Creates a `profiles` row — copies the user ID, extracts display_name from email (e.g., `john@gmail.com` → `john`), sets `tier_id = 'free'`
 2. Gives 5 free tokens — sets `token_balance = 5` so new users can try the service immediately
 3. Logs the bonus — inserts a `token_transactions` row (amount=5, type='topup', reference='signup_bonus', channel='system')
-3. `INSERT INTO token_transactions` (amount=5, type='topup', reference='signup_bonus', channel='system')
+4. Creates a `subscriptions` row — tier_id='free', status='active', billing_cycle='monthly'
+
+### `refresh_subscription_tokens(p_user_id, p_monthly_tokens, p_max_rollover)` (RPC)
+
+Called on subscription renewal. Atomically applies rollover cap and credits new monthly tokens.
+
+| Parameter | Example | What it's for |
+|-----------|---------|---------------|
+| `p_user_id` | `'abc-123-...'` | Which user to renew |
+| `p_monthly_tokens` | `2000` | Monthly token allocation for the tier |
+| `p_max_rollover` | `2000` | Max tokens that carry over |
+
+**Returns** `INT` — the user's new balance after renewal.
+
+**Steps:**
+1. Lock the profile row (`SELECT ... FOR UPDATE`)
+2. Calculate rollover: `min(current_balance, max_rollover)`
+3. Set new balance: `rollover + monthly_tokens`
+4. If tokens were capped, log a `subscription` / `rollover_cap` transaction
+5. Log the subscription credit transaction
+6. Update `subscriptions.rollover_tokens` and `tokens_refreshed_at`
 
 ### `set_updated_at()` (Trigger)
 
@@ -419,3 +487,70 @@ Fires `BEFORE UPDATE` on profiles, payments, projects, project_images. Sets `upd
 | `002_*` | Creates `projects` and `project_images` tables, RLS policies, triggers |
 | `003_*` | Adds `editable_blocks` JSONB column to `project_images` |
 | `004_signup_free_tokens.sql` | Updates `handle_new_user()` trigger to award 5 free tokens on signup |
+| `005_project_manga_context.sql` | Adds manga context extraction to projects |
+| `006_subscription_tiers.sql` | Creates `subscription_tiers`, `subscriptions`, `subscription_payments` tables; adds `tier_id` to profiles; seeds 4 tier rows; adds `refresh_subscription_tokens()` RPC; updates `handle_new_user()` trigger; backfills free subscriptions for existing users |
+
+---
+
+## Subscription Tables
+
+### `subscription_tiers`
+
+A static reference table with 4 rows defining each subscription plan's limits and feature permissions. Rarely changes — the API caches it in memory.
+
+| Column | Type | What it's for |
+|--------|------|---------------|
+| `id` | TEXT, PK | Tier identifier: `'free'`, `'starter'`, `'pro'`, `'premium'` |
+| `name` | TEXT | Display name shown in the UI |
+| `price_satangs` | INT | Monthly price in satangs (9900 = ฿99, 24900 = ฿249, etc.) |
+| `annual_price_satangs` | INT | Annual price in satangs (2 months free) |
+| `monthly_tokens` | INT | Tokens credited each billing cycle (50, 500, 2000, 5000) |
+| `token_cost_per_image` | INT | How many tokens one image translation costs (default 10) |
+| `max_projects` | INT | Maximum active projects for this tier (1, 3, 10, 50) |
+| `project_expiry_days` | INT | Auto-delete projects after N days (7, 14, 30, 60) |
+| `max_rollover` | INT | Maximum tokens that carry over on renewal |
+| `batch_limit` | INT | Maximum images in a single batch translation (1, 5, 20, 50) |
+| `features` | JSONB | Feature permission flags — see Permission System |
+
+**RLS**: Anyone can read (public reference data).
+
+### `subscriptions`
+
+One row per user. Tracks the user's current subscription state, billing period, and Omise integration.
+
+| Column | Type | What it's for |
+|--------|------|---------------|
+| `id` | BIGSERIAL, PK | Row ID |
+| `user_id` | UUID, UNIQUE, FK | Which user (1:1 with profiles) |
+| `tier_id` | TEXT, FK | Current tier — `subscription_tiers(id)` |
+| `billing_cycle` | TEXT | `'monthly'` or `'annual'` |
+| `status` | TEXT | `'active'`, `'cancelled'`, `'past_due'`, `'expired'` |
+| `current_period_start` | TIMESTAMPTZ | When the current billing period began |
+| `current_period_end` | TIMESTAMPTZ | When the current billing period ends |
+| `tokens_refreshed_at` | TIMESTAMPTZ | Last time subscription tokens were credited |
+| `rollover_tokens` | INT | How many tokens rolled over from the previous cycle |
+| `omise_schedule_id` | TEXT | Omise Schedules API ID for recurring charges |
+| `omise_customer_id` | TEXT | Omise Customer ID for saved card billing |
+| `cancel_at_period_end` | BOOLEAN | If true, don't renew — downgrade to free at period end |
+
+**RLS**: Users read own subscription. Service role manages all.
+
+### `subscription_payments`
+
+Tracks recurring subscription charges separately from one-time top-ups (which use the `payments` table).
+
+| Column | Type | What it's for |
+|--------|------|---------------|
+| `id` | BIGSERIAL, PK | Row ID |
+| `user_id` | UUID, FK | Which user |
+| `subscription_id` | BIGINT, FK | Which subscription |
+| `omise_charge_id` | TEXT, UNIQUE | Omise charge ID (prevents double-processing) |
+| `tier_id` | TEXT, FK | Which tier was charged |
+| `billing_cycle` | TEXT | monthly or annual |
+| `amount_satangs` | INT | Amount charged |
+| `tokens_credited` | INT | Tokens credited on success |
+| `status` | TEXT | `'pending'`, `'successful'`, `'failed'`, `'refunded'` |
+| `period_start` | TIMESTAMPTZ | Billing period this charge covers (start) |
+| `period_end` | TIMESTAMPTZ | Billing period this charge covers (end) |
+
+**RLS**: Users read own payments. Service role manages all.

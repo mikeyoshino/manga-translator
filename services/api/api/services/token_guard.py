@@ -59,5 +59,22 @@ def deduct_or_raise(
     if is_admin:
         return None
     if not sb.deduct_tokens(user_id, amount, reference=reference, channel="api"):
-        raise HTTPException(status_code=402, detail="Insufficient tokens")
+        # Return enriched 402 response with balance & tier for frontend modal
+        balance = 0
+        tier = "free"
+        try:
+            profile = sb.get_user_profile(user_id)
+            balance = profile.get("token_balance", 0)
+            tier = profile.get("tier_id", "free")
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": "insufficient_tokens",
+                "balance": balance,
+                "required": amount,
+                "tier": tier,
+            },
+        )
     return TokenCharge(user_id, amount, reference)
