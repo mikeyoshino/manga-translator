@@ -127,6 +127,7 @@ function ProjectContent() {
   const [maskDilationOffset, setMaskDilationOffset] = useState<number>(savedSettings.maskDilationOffset ?? 30);
   const [inpainter, setInpainter] = useState(savedSettings.inpainter || "lama_large");
   const [skipOutsideBubble, setSkipOutsideBubble] = useState(savedSettings.skipOutsideBubble ?? false);
+  const [configOpen, setConfigOpen] = useState(false);
 
   const isProcessing = useMemo(() => {
     if (fileStatuses.size === 0) return false;
@@ -504,14 +505,20 @@ function ProjectContent() {
   return (
     <>
       <div className="flex flex-1 overflow-hidden">
-        <main className="flex-1 overflow-y-auto p-6 space-y-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-8">
           {/* Title + Actions */}
-          <div className="flex items-end justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-0 justify-between">
             <div>
               <h2 className="text-2xl font-bold text-slate-800">{projectName}</h2>
               <p className="text-sm text-slate-500">{projectImages.length} {i.images}</p>
             </div>
             <div className="flex gap-2">
+              <button
+                onClick={() => setConfigOpen(v => !v)}
+                className="md:hidden flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded-xl hover:bg-slate-200 transition-all"
+              >
+                <Settings2 className="w-4 h-4" />
+              </button>
               {translatedCount > 0 && (
                 <button
                   onClick={openEditor}
@@ -626,8 +633,16 @@ function ProjectContent() {
           )}
         </main>
 
+        {/* Backdrop for mobile config sidebar */}
+        {configOpen && (
+          <div className="fixed inset-0 bg-black/20 z-10 md:hidden" onClick={() => setConfigOpen(false)} />
+        )}
         {/* Configuration Sidebar */}
-        <aside className="w-80 bg-white border-l border-slate-200 flex flex-col shadow-[-4px_0_15px_rgba(0,0,0,0.02)] z-20 overflow-y-auto">
+        <aside className={`
+          ${configOpen ? 'fixed right-0 top-14 bottom-0 z-20 shadow-xl' : 'hidden'}
+          md:relative md:block md:shadow-none md:top-auto
+          w-80 bg-white border-l border-slate-200 flex flex-col overflow-y-auto
+        `}>
           <div className="p-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/50 sticky top-0 z-10">
             <Settings2 className="w-4 h-4 text-slate-500" />
             <h2 className="font-bold text-sm text-slate-700 uppercase tracking-tight">{i.config}</h2>

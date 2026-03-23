@@ -80,7 +80,7 @@ export function EditorToolbar({ onTogglePanel, panelOpen }: EditorToolbarProps) 
         <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">{i.back}</span>
       </button>
 
-      <div className="flex items-center gap-2 ml-2 sm:ml-4">
+      <div className="flex items-center gap-2 ml-2 sm:ml-4 shrink-0">
         <button
           onClick={handlePrev}
           disabled={currentImageIndex === 0}
@@ -88,7 +88,7 @@ export function EditorToolbar({ onTogglePanel, panelOpen }: EditorToolbarProps) 
         >
           <ChevronLeft className="w-4 h-4 text-slate-600" />
         </button>
-        <span className="text-xs sm:text-sm font-medium text-slate-600">
+        <span className="text-xs sm:text-sm font-medium text-slate-600 whitespace-nowrap">
           {i.image} {currentImageIndex + 1} / {images.length}
         </span>
         <button

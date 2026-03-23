@@ -31,7 +31,7 @@ export default function EditorPage() {
 }
 
 function EditorContent() {
-  const { images, currentImage, undo, redo } = useEditor();
+  const { images, currentImage, undo, redo, selectedBlockId } = useEditor();
   const navigate = useNavigate();
   const [isClient, setIsClient] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -41,6 +41,13 @@ function EditorContent() {
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Auto-open panel when block selected (mobile/tablet only)
+  useEffect(() => {
+    if (selectedBlockId && window.innerWidth < 1024) {
+      setPanelOpen(true);
+    }
+  }, [selectedBlockId]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -91,6 +98,13 @@ function EditorContent() {
         <div className="flex-1 min-w-0 bg-slate-200">
           <ClientOnlyCanvas />
         </div>
+        {/* Backdrop for mobile panel */}
+        {panelOpen && (
+          <div
+            className="absolute inset-0 bg-black/20 z-[5] lg:hidden"
+            onClick={() => setPanelOpen(false)}
+          />
+        )}
         {/* Properties panel: always visible on lg+, overlay below lg */}
         <div className={`
           ${panelOpen ? 'absolute right-0 top-0 bottom-0 z-10 shadow-xl' : 'hidden'}
