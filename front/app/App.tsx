@@ -113,11 +113,11 @@ export const App: React.FC = () => {
       <Navbar showLanguageToggle />
 
       {/* Main Content — Project List */}
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="max-w-5xl mx-auto">
           {/* Welcome banner for new users */}
           {showWelcome && !isAdmin && (
-            <div className="mb-6 bg-gradient-to-r from-indigo-50 to-emerald-50 border border-indigo-200 rounded-2xl p-5 flex items-start gap-4">
+            <div className="mb-4 sm:mb-6 bg-gradient-to-r from-indigo-50 to-emerald-50 border border-indigo-200 rounded-2xl p-4 sm:p-5 flex items-start gap-4">
               <div className="bg-emerald-100 w-10 h-10 rounded-xl flex items-center justify-center shrink-0">
                 <Coins className="w-5 h-5 text-emerald-600" />
               </div>
@@ -130,13 +130,13 @@ export const App: React.FC = () => {
               </button>
             </div>
           )}
-          <div className="flex items-end justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-0 justify-between mb-4 sm:mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-slate-800">{i.projects}</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-800">{i.projects}</h2>
             </div>
             <button
               onClick={() => { setShowCreateModal(true); setCreateError(""); setNewProjectName(""); }}
-              className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all"
+              className="flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all"
             >
               <Plus className="w-4 h-4" /> {i.createProject}
             </button>
@@ -155,7 +155,7 @@ export const App: React.FC = () => {
               <p className="text-sm text-slate-400 max-w-sm mx-auto">{i.noProjectsDesc}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {projectList.map((project) => {
                 const daysLeft = getDaysLeft(project.expires_at);
                 return (
@@ -165,7 +165,7 @@ export const App: React.FC = () => {
                     className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer group"
                   >
                     {/* Thumbnail */}
-                    <div className="h-40 bg-slate-100 flex items-center justify-center overflow-hidden">
+                    <div className="h-32 sm:h-40 bg-slate-100 flex items-center justify-center overflow-hidden">
                       {project.thumbnail_url ? (
                         <img src={project.thumbnail_url} alt={project.name} loading="lazy" className="w-full h-full object-cover" />
                       ) : (
@@ -173,7 +173,7 @@ export const App: React.FC = () => {
                       )}
                     </div>
                     {/* Info */}
-                    <div className="p-4">
+                    <div className="p-3 sm:p-4">
                       <div className="flex items-start justify-between mb-2">
                         <h3 className="text-sm font-bold text-slate-700 truncate flex-1">{project.name}</h3>
                         <button

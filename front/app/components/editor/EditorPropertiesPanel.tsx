@@ -39,7 +39,7 @@ function DrawingToolsPanel() {
 
   if (activeTool === "eraser") {
     return (
-      <div className="w-64 bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
+      <div className="w-64 h-full bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
         <h3 className="text-sm font-bold mb-3 text-slate-700">{i.drawingTools}</h3>
 
         <label className="block text-xs font-semibold text-slate-500 mb-1">{i.eraserSize}</label>
@@ -81,7 +81,7 @@ function DrawingToolsPanel() {
 
   // Pen mode
   return (
-    <div className="w-64 bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
+    <div className="w-64 h-full bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
       <h3 className="text-sm font-bold mb-3 text-slate-700">{i.drawingTools}</h3>
 
       {/* Color picker */}
@@ -162,7 +162,7 @@ function BlockPropertiesPanel() {
 
   if (!currentImage || !selectedBlockId) {
     return (
-      <div className="w-64 bg-white border-l border-slate-200 p-4 shrink-0">
+      <div className="w-64 h-full bg-white border-l border-slate-200 p-4 shrink-0">
         <p className="text-slate-400 text-sm">{i.clickToEdit}</p>
       </div>
     );
@@ -176,7 +176,7 @@ function BlockPropertiesPanel() {
   };
 
   return (
-    <div className="w-64 bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
+    <div className="w-64 h-full bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
       <h3 className="text-sm font-bold mb-3 text-slate-700">{i.textProperties}</h3>
 
       {/* Source text (read-only reference) */}
@@ -420,7 +420,7 @@ function MagicRemoverPanel() {
   const historyStack = currentImage ? (imageHistory.get(currentImage.id) || []) : [];
 
   return (
-    <div className="w-64 bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
+    <div className="w-64 h-full bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
       <h3 className="text-sm font-bold mb-3 text-indigo-700">{i.magicRemover}</h3>
 
       {/* Brush size */}
@@ -498,7 +498,7 @@ function ManualTranslatePanel() {
   const rect = currentImage ? manualTranslateRect.get(currentImage.id) ?? null : null;
 
   return (
-    <div className="w-64 bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
+    <div className="w-64 h-full bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
       <h3 className="text-sm font-bold mb-3 text-indigo-700">{i.manualTranslate}</h3>
 
       {!rect ? (
@@ -565,7 +565,7 @@ function CloneStampPanel() {
   const strokes = currentImage ? (cloneStampStrokes.get(currentImage.id) || []) : [];
 
   return (
-    <div className="w-64 bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
+    <div className="w-64 h-full bg-white border-l border-slate-200 p-3 shrink-0 overflow-y-auto">
       <h3 className="text-sm font-bold mb-3 text-indigo-700">{i.cloneStamp}</h3>
 
       {/* Source point */}
