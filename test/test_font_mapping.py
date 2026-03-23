@@ -52,6 +52,39 @@ def test_set_font_empty_uses_fallbacks():
     assert len(text_render.FONT_SELECTION) == len(text_render.FALLBACK_FONTS)
 
 
+def test_set_font_sets_current_font_path():
+    """set_font() also sets _CURRENT_FONT_PATH for the Thai Pillow renderer."""
+    tha_font = text_render.LANGUAGE_FONTS.get('THA')
+    if tha_font and os.path.isfile(tha_font):
+        text_render.set_font(tha_font)
+        assert text_render._CURRENT_FONT_PATH == tha_font
+
+    text_render.set_font('')
+    assert text_render._CURRENT_FONT_PATH == ''
+
+
+def test_curated_thai_fonts_exist():
+    """All 12 curated Thai manga fonts are present in fonts/ directory."""
+    from manga_translator.utils import BASE_PATH
+    expected_fonts = [
+        'Sarabun-Regular.ttf',
+        'Prompt-Regular.ttf',
+        'Mitr-Regular.ttf',
+        'Niramit-Regular.ttf',
+        'K2D-Regular.ttf',
+        'Kodchasan-Regular.ttf',
+        'Krub-Regular.ttf',
+        'BaiJamjuree-Regular.ttf',
+        'ChakraPetch-Regular.ttf',
+        'Pridi-Regular.ttf',
+        'Charm-Regular.ttf',
+        'Chonburi-Regular.ttf',
+    ]
+    for font_file in expected_fonts:
+        path = os.path.join(BASE_PATH, 'fonts', font_file)
+        assert os.path.isfile(path), f"Curated Thai font not found: {path}"
+
+
 # --- dispatch language_fonts override tests ---
 
 @pytest.mark.asyncio
