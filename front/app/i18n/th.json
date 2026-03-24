@@ -175,7 +175,9 @@
     "pwRuleLetter": "มีตัวอักษรภาษาอังกฤษ (a-z)",
     "pwRuleNumber": "มีตัวเลข (0-9)",
     "pwRuleSpecial": "มีอักขระพิเศษ (!@#$% เป็นต้น)",
-    "pwRuleAsciiOnly": "ใช้เฉพาะตัวอักษรภาษาอังกฤษเท่านั้น"
+    "pwRuleAsciiOnly": "ใช้เฉพาะตัวอักษรภาษาอังกฤษเท่านั้น",
+    "or": "หรือ",
+    "continueWithGoogle": "เข้าสู่ระบบด้วย Google"
   },
   "navbar": {
     "tokens": "โทเค็น",
