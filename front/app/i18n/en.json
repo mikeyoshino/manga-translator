@@ -175,7 +175,9 @@
     "pwRuleLetter": "Contains a letter (a-z)",
     "pwRuleNumber": "Contains a number (0-9)",
     "pwRuleSpecial": "Contains a special character (!@#$% etc.)",
-    "pwRuleAsciiOnly": "English characters only (no Thai or other scripts)"
+    "pwRuleAsciiOnly": "English characters only (no Thai or other scripts)",
+    "or": "or",
+    "continueWithGoogle": "Continue with Google"
   },
   "navbar": {
     "tokens": "Tokens",

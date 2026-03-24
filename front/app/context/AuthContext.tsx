@@ -21,6 +21,7 @@ interface AuthContextValue {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, displayName?: string, locale?: string) => Promise<{ error: Error | null }>;
+  signInWithGoogle: (locale?: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshBalance: () => Promise<void>;
 }
@@ -167,6 +168,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   };
 
+  const signInWithGoogle = async (locale?: string) => {
+    const redirectLocale = locale || "th";
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/${redirectLocale}/auth/callback`,
+      },
+    });
+  };
+
   const signOut = async () => {
     await apiFetch("/api/auth/signout", { method: "POST" });
     await supabase.auth.signOut();
@@ -178,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, tokenBalance, isAdmin, tierId, subscription, loading, signIn, signUp, signOut, refreshBalance }}>
+    <AuthContext.Provider value={{ user, tokenBalance, isAdmin, tierId, subscription, loading, signIn, signUp, signInWithGoogle, signOut, refreshBalance }}>
       {children}
     </AuthContext.Provider>
   );

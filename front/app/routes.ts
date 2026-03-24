@@ -6,6 +6,7 @@ export default [
     layout("routes/locale-layout.tsx", [
       index("routes/landing.tsx"),
       route("login", "routes/login.tsx"),
+      route("auth/callback", "routes/auth-callback.tsx"),
       route("studio", "routes/home.tsx"),
       route("studio/editor", "routes/editor.tsx"),
       route("studio/projects/:projectId", "routes/project.tsx"),
