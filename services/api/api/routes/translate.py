@@ -11,6 +11,7 @@ from manga_shared.config import Config
 
 from api.services.auth import AuthUser, get_current_user
 from api.services.token_guard import deduct_or_raise
+from api.services.feature_guard import Feature, require_feature
 from api.adapters.redis_queue import task_queue
 from api.models.requests import TranslateRequest, BatchTranslateRequest
 from api.models.responses import to_translation, TranslationResponse
@@ -186,6 +187,7 @@ async def inpaint(
     mask: UploadFile = File(...),
     inpainting_size: int = Form(2048),
     user: AuthUser = Depends(get_current_user),
+    _feature: AuthUser = Depends(require_feature(Feature.MAGIC_REMOVER)),
 ) -> StreamingResponse:
     """Run AI inpainting: route to RunPod GPU worker."""
     charge = deduct_or_raise(user.id, TOKEN_COST_PER_IMAGE, "inpaint", user.is_admin)

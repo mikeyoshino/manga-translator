@@ -189,3 +189,14 @@ export function useAuth(): AuthContextValue {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
+
+/**
+ * Check if the current user has a specific feature enabled by their subscription tier.
+ * Admins always return true. Returns false while loading or if not authenticated.
+ */
+export function useHasFeature(feature: string): boolean {
+  const { isAdmin, subscription } = useAuth();
+  if (isAdmin) return true;
+  if (!subscription?.permissions) return false;
+  return !!subscription.permissions[feature];
+}
