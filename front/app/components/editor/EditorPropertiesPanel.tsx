@@ -2,6 +2,7 @@ import { useEditor } from "@/context/EditorContext";
 import { availableFonts } from "@/utils/fontMap";
 import { useT } from "@/context/LocaleContext";
 import { useHasFeature } from "@/context/AuthContext";
+import { WatermarkPanel } from "./WatermarkPanel";
 
 function InfoTooltip({ text }: { text: string }) {
   return (
@@ -675,6 +676,11 @@ export function EditorPropertiesPanel() {
   const hasMagicRemover = useHasFeature("editor.magic_remover");
   const hasManualTranslate = useHasFeature("editor.manual_translate");
   const hasCloneStamp = useHasFeature("editor.clone_stamp");
+  const hasWatermark = useHasFeature("editor.watermark");
+
+  if (activeTool === "watermark" && hasWatermark) {
+    return <WatermarkPanel />;
+  }
 
   if (activeTool === "cloneStamp" && hasCloneStamp) {
     return <CloneStampPanel />;

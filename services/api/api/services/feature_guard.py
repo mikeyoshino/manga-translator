@@ -25,6 +25,7 @@ class Feature(str, Enum):
     TEXT_BORDER = "editor.text_border"
     BULK_EXPORT_ZIP = "editor.bulk_export_zip"
     UPSCALING = "editor.upscaling"
+    WATERMARK = "editor.watermark"
 
 
 # ---------------------------------------------------------------------------

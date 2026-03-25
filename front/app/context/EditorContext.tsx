@@ -6,6 +6,8 @@ import Sentry from "@/lib/sentry";
 import { initEditableBlocksWithOffset } from "@/utils/initEditableBlocks";
 import { loadSettings } from "@/utils/localStorage";
 import { apiFetch } from "@/utils/api";
+import type { WatermarkSettings } from "@/utils/drawWatermark";
+import { DEFAULT_WATERMARK_SETTINGS } from "@/utils/drawWatermark";
 
 export interface DrawingLine {
   points: number[];
@@ -29,7 +31,7 @@ export interface ManualTranslateRect {
   height: number;
 }
 
-export type ActiveTool = "select" | "pen" | "eraser" | "magicRemover" | "manualTranslate" | "cloneStamp";
+export type ActiveTool = "select" | "pen" | "eraser" | "magicRemover" | "manualTranslate" | "cloneStamp" | "watermark";
 
 interface EditorContextValue {
   images: EditorImage[];
@@ -81,6 +83,9 @@ interface EditorContextValue {
   clearCloneStampStrokes: (imageId: string) => void;
   isCloneStamping: boolean;
   applyCloneStamp: (imageId: string) => Promise<void>;
+  // Watermark
+  watermarkSettings: WatermarkSettings;
+  setWatermarkSettings: React.Dispatch<React.SetStateAction<WatermarkSettings>>;
   // Unified undo/redo
   undo: () => void;
   redo: () => void;
@@ -111,6 +116,7 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   const [cloneStampSourceMap, setCloneStampSourceMap] = useState<Map<string, { x: number; y: number } | null>>(new Map());
   const [cloneStampStrokes, setCloneStampStrokes] = useState<Map<string, CloneStampStroke[]>>(new Map());
   const [isCloneStamping, setIsCloneStamping] = useState(false);
+  const [watermarkSettings, setWatermarkSettings] = useState<WatermarkSettings>(DEFAULT_WATERMARK_SETTINGS);
   const { user } = useAuth();
   const saveTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const imagesRef = useRef<EditorImage[]>([]);
@@ -1010,6 +1016,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         clearCloneStampStrokes,
         isCloneStamping,
         applyCloneStamp,
+        watermarkSettings,
+        setWatermarkSettings,
         undo,
         redo,
         canUndo,

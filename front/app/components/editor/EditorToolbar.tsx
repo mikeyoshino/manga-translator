@@ -2,7 +2,7 @@ import { useEditor } from "@/context/EditorContext";
 import { useNavigate } from "react-router";
 import { exportSingleImage, exportAllAsZip } from "@/utils/exportZip";
 import { useCallback } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, FolderArchive, Pencil, Eraser, Undo2, Redo2, Sparkles, ScanSearch, Stamp, PanelRightOpen } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, FolderArchive, Pencil, Eraser, Undo2, Redo2, Sparkles, ScanSearch, Stamp, Droplets, PanelRightOpen } from "lucide-react";
 import { useT, useLocalePath } from "@/context/LocaleContext";
 import { useHasFeature } from "@/context/AuthContext";
 
@@ -27,6 +27,7 @@ export function EditorToolbar({ onTogglePanel, panelOpen }: EditorToolbarProps) 
   const hasManualTranslate = useHasFeature("editor.manual_translate");
   const hasCloneStamp = useHasFeature("editor.clone_stamp");
   const hasBulkExportZip = useHasFeature("editor.bulk_export_zip");
+  const hasWatermark = useHasFeature("editor.watermark");
 
   const handleBack = () => navigate(lp("/studio"));
 
@@ -67,7 +68,7 @@ export function EditorToolbar({ onTogglePanel, panelOpen }: EditorToolbarProps) 
     exportAllAsZip(getter, images);
   }, [images, getCompositeCanvas]);
 
-  const handleToolClick = (tool: "pen" | "eraser" | "magicRemover" | "manualTranslate" | "cloneStamp") => {
+  const handleToolClick = (tool: "pen" | "eraser" | "magicRemover" | "manualTranslate" | "cloneStamp" | "watermark") => {
     setActiveTool(activeTool === tool ? "select" : tool);
   };
 
@@ -172,6 +173,19 @@ export function EditorToolbar({ onTogglePanel, panelOpen }: EditorToolbarProps) 
             }`}
           >
             <Stamp className="w-4 h-4" />
+          </button>
+        )}
+        {hasWatermark && (
+          <button
+            onClick={() => handleToolClick("watermark")}
+            title={i.watermark}
+            className={`p-1.5 rounded-lg transition-colors ${
+              activeTool === "watermark"
+                ? "bg-indigo-600 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Droplets className="w-4 h-4" />
           </button>
         )}
         {isDrawing && (activeTool === "magicRemover" ? currentMagicLines.length > 0 : activeTool === "cloneStamp" ? currentCloneStrokes.length > 0 : currentLines.length > 0) && (

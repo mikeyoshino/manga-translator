@@ -221,6 +221,38 @@ JSON keys are namespaced: `landing`, `login`, `navbar`, `home`, `project`, `topu
 - **Error tracking**: Sentry Cloud captures errors from API, Worker, and Client. DSN configured via `SENTRY_DSN` (backend) / `VITE_SENTRY_DSN` (frontend) env vars.
 - **When adding try/except**: Always call `sentry_sdk.capture_exception(e)` and `logger.error(...)` with context before re-raising or handling.
 
+## Feature Gating by Subscription Tier
+
+Editor features are gated by subscription tier using a permission system.
+
+### How it works
+- **Backend**: `Feature` enum in `services/api/api/services/feature_guard.py` defines all gated features (e.g., `Feature.WATERMARK = "editor.watermark"`). `DEFAULT_FREE_PERMISSIONS` in `services/api/api/services/subscription.py` sets all features to `False` by default. Tier permissions come from the `features` JSONB column in the `subscription_tiers` Supabase table.
+- **Frontend**: `useHasFeature("editor.feature_name")` hook from `front/app/context/AuthContext.tsx` checks if the current user's subscription grants access. Admins always get `true`.
+
+### Current gated features
+| Feature key | Description | Minimum tier |
+|-------------|-------------|-------------|
+| `editor.magic_remover` | AI-powered text removal | Pro |
+| `editor.clone_stamp` | Clone stamp tool | Pro |
+| `editor.manual_translate` | Manual region translation | Pro |
+| `editor.text_border` | Text stroke/outline | Pro |
+| `editor.bulk_export_zip` | Export all images as ZIP | Pro |
+| `editor.upscaling` | Image upscaling | Premium |
+| `editor.watermark` | Text/image watermark overlay | Pro |
+
+### Adding a new gated feature
+1. Add the permission key to `DEFAULT_FREE_PERMISSIONS` in `services/api/api/services/subscription.py` (set to `False`)
+2. Add the enum member to `Feature` in `services/api/api/services/feature_guard.py`
+3. Update the tier's `features` JSONB in the `subscription_tiers` Supabase table to include `"editor.your_feature": true`
+4. Frontend: gate UI with `useHasFeature("editor.your_feature")`
+
+### Watermark feature (`editor.watermark`)
+- **State**: `WatermarkSettings` in `EditorContext` — global (not per-image), includes text/image mode, font, color, border, opacity, position preset (9-point grid + offset)
+- **UI**: `WatermarkPanel.tsx` in the right sidebar when watermark tool is active
+- **Preview**: Konva `<Layer>` in `EditorCanvas.tsx` renders live watermark preview (automatically included in export composite)
+- **Utility**: `front/app/utils/drawWatermark.ts` — `computeWatermarkPosition()`, `shouldApplyWatermark()`, `drawWatermark()`
+- **Page scope**: Apply to all pages or specific pages via `selectedPageIds` Set
+
 ## Token Billing & Refund
 
 All paid endpoints (`/translate/with-form/*`, `/inpaint`, `/projects/.../translate`) deduct tokens before work starts and refund on failure.
