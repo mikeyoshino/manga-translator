@@ -1,8 +1,10 @@
-import { useRef, useEffect, useState, useCallback } from "react";
-import { Stage, Layer, Image as KonvaImage, Line, Rect, Circle } from "react-konva";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
+import { Stage, Layer, Image as KonvaImage, Line, Rect, Circle, Text as KonvaText } from "react-konva";
 import { useEditor } from "@/context/EditorContext";
 import { BlockOverlay } from "./BlockOverlay";
 import type { DrawingLine, CloneStampStroke } from "@/context/EditorContext";
+import { computeWatermarkPosition, shouldApplyWatermark } from "@/utils/drawWatermark";
+import { loadFont } from "@/utils/fontLoader";
 
 interface InlineEdit {
   blockId: string;
@@ -43,6 +45,7 @@ export function EditorCanvas() {
     addCloneStampStroke,
     cloneStampSize,
     cloneStampOpacity,
+    watermarkSettings,
   } = useEditor();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,6 +69,9 @@ export function EditorCanvas() {
   const [cloneStampPreview, setCloneStampPreview] = useState<HTMLImageElement | null>(null);
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Watermark image preview
+  const [watermarkImg, setWatermarkImg] = useState<HTMLImageElement | null>(null);
 
   const isDrawingTool = activeTool === "pen" || activeTool === "eraser" || activeTool === "magicRemover";
   const isRectTool = activeTool === "manualTranslate";
@@ -143,6 +149,44 @@ export function EditorCanvas() {
     container.addEventListener("wheel", handler, { passive: false });
     return () => container.removeEventListener("wheel", handler);
   }, []);
+
+  // Load watermark image when dataUrl changes
+  useEffect(() => {
+    if (watermarkSettings.type !== "image" || !watermarkSettings.imageDataUrl) {
+      setWatermarkImg(null);
+      return;
+    }
+    const img = new window.Image();
+    img.onload = () => setWatermarkImg(img);
+    img.src = watermarkSettings.imageDataUrl;
+  }, [watermarkSettings.type, watermarkSettings.imageDataUrl]);
+
+  // Preload watermark font
+  useEffect(() => {
+    if (watermarkSettings.type === "text" && watermarkSettings.enabled) {
+      loadFont(watermarkSettings.fontFamily);
+    }
+  }, [watermarkSettings.type, watermarkSettings.enabled, watermarkSettings.fontFamily]);
+
+  // Compute watermark preview position
+  const showWatermarkPreview = currentImage && shouldApplyWatermark(watermarkSettings, currentImage.id) && bgImage;
+  const watermarkPos = useMemo(() => {
+    if (!showWatermarkPreview || !bgImage) return { x: 0, y: 0 };
+    if (watermarkSettings.type === "text") {
+      // Approximate text width — Konva Text will handle actual rendering
+      const approxW = watermarkSettings.text.length * watermarkSettings.fontSize * 0.6;
+      return computeWatermarkPosition(
+        bgImage.naturalWidth, bgImage.naturalHeight,
+        approxW, watermarkSettings.fontSize,
+        watermarkSettings.position, watermarkSettings.offsetX, watermarkSettings.offsetY,
+      );
+    }
+    return computeWatermarkPosition(
+      bgImage.naturalWidth, bgImage.naturalHeight,
+      watermarkSettings.imageWidth, watermarkSettings.imageHeight,
+      watermarkSettings.position, watermarkSettings.offsetX, watermarkSettings.offsetY,
+    );
+  }, [showWatermarkPreview, bgImage, watermarkSettings]);
 
   const commitInlineEdit = useCallback(() => {
     setInlineEdit((prev) => {
@@ -633,6 +677,35 @@ export function EditorCanvas() {
             ) : null;
           })()}
         </Layer>
+
+        {/* Watermark preview layer */}
+        {showWatermarkPreview && (
+          <Layer listening={false}>
+            {watermarkSettings.type === "text" && (
+              <KonvaText
+                x={watermarkPos.x}
+                y={watermarkPos.y}
+                text={watermarkSettings.text}
+                fontSize={watermarkSettings.fontSize}
+                fontFamily={watermarkSettings.fontFamily}
+                fill={watermarkSettings.color}
+                opacity={watermarkSettings.opacity}
+                stroke={watermarkSettings.borderEnabled ? watermarkSettings.borderColor : undefined}
+                strokeWidth={watermarkSettings.borderEnabled ? watermarkSettings.borderWidth : 0}
+              />
+            )}
+            {watermarkSettings.type === "image" && watermarkImg && (
+              <KonvaImage
+                x={watermarkPos.x}
+                y={watermarkPos.y}
+                image={watermarkImg}
+                width={watermarkSettings.imageWidth}
+                height={watermarkSettings.imageHeight}
+                opacity={watermarkSettings.opacity}
+              />
+            )}
+          </Layer>
+        )}
       </Stage>
 
       {/* Inline text editing overlay */}

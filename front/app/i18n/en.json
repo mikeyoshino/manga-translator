@@ -91,10 +91,8 @@
           "cta": "Subscribe",
           "popular": false,
           "features": [
+            "All Free features, plus:",
             "3 projects (14-day expiry)",
-            "Basic text editing",
-            "Pen & eraser tools",
-            "Single image export",
             "Batch translate up to 5 images"
           ]
         },
@@ -108,12 +106,13 @@
           "cta": "Subscribe",
           "popular": true,
           "features": [
+            "All Starter features, plus:",
             "10 projects (30-day expiry)",
-            "Everything in Starter, plus:",
             "Magic Remover (AI text removal)",
             "Clone Stamp (background repair)",
             "Manual Translate (re-translate regions)",
             "Text Border/Stroke styling",
+            "Watermark (text & image overlay)",
             "Bulk export as ZIP",
             "Batch translate up to 20 images"
           ]
@@ -128,8 +127,8 @@
           "cta": "Subscribe",
           "popular": false,
           "features": [
+            "All Pro features, plus:",
             "Unlimited projects (60-day expiry)",
-            "Everything in Pro, plus:",
             "Image Upscaling (HD output)",
             "Batch translate up to 50 images"
           ]
@@ -494,6 +493,29 @@
     "guideStep1": "Alt+click to pick source point",
     "guideStep2": "Click & drag to paint over text",
     "guideStep3": "Press \"Apply\" to commit",
-    "guideTip": "Best for removing SFX over detailed backgrounds"
+    "guideTip": "Best for removing SFX over detailed backgrounds",
+    "watermark": "Watermark",
+    "watermarkEnable": "Enable Watermark",
+    "watermarkApplyTo": "Apply To",
+    "watermarkAllPages": "All Pages",
+    "watermarkSpecificPages": "Specific Pages",
+    "watermarkType": "Type",
+    "watermarkText": "Text",
+    "watermarkImage": "Image",
+    "watermarkContent": "Content",
+    "watermarkFont": "Font",
+    "watermarkFontSize": "Size",
+    "watermarkColor": "Color",
+    "watermarkBorder": "Text Border",
+    "watermarkBorderColor": "Border Color",
+    "watermarkBorderWidth": "Border Width",
+    "watermarkOpacity": "Opacity",
+    "watermarkUpload": "Upload Image",
+    "watermarkPosition": "Position",
+    "watermarkOffsetX": "Offset X",
+    "watermarkOffsetY": "Offset Y",
+    "watermarkImageWidth": "Width",
+    "watermarkImageHeight": "Height",
+    "watermarkPreview": "Preview is shown on canvas"
   }
 }

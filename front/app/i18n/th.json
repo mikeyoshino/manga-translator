@@ -91,10 +91,8 @@
           "cta": "สมัครสมาชิก",
           "popular": false,
           "features": [
+            "ฟีเจอร์ Free ทั้งหมด รวมถึง:",
             "3 โปรเจกต์ (หมดอายุ 14 วัน)",
-            "แก้ไขข้อความพื้นฐาน",
-            "ปากกาและยางลบ",
-            "ส่งออกรูปเดี่ยว",
             "แปลพร้อมกันสูงสุด 5 รูป"
           ]
         },
@@ -108,12 +106,13 @@
           "cta": "สมัครสมาชิก",
           "popular": true,
           "features": [
+            "ฟีเจอร์ Starter ทั้งหมด รวมถึง:",
             "10 โปรเจกต์ (หมดอายุ 30 วัน)",
-            "ทุกอย่างใน Starter รวมถึง:",
             "Magic Remover (AI ลบข้อความ)",
             "Clone Stamp (ซ่อมพื้นหลัง)",
             "Manual Translate (แปลเฉพาะจุด)",
             "เส้นขอบข้อความ (Text Border)",
+            "ลายน้ำ (ข้อความ & รูปภาพ)",
             "ส่งออก ZIP ทั้งหมด",
             "แปลพร้อมกันสูงสุด 20 รูป"
           ]
@@ -128,8 +127,8 @@
           "cta": "สมัครสมาชิก",
           "popular": false,
           "features": [
+            "ฟีเจอร์ Pro ทั้งหมด รวมถึง:",
             "โปรเจกต์ไม่จำกัด (หมดอายุ 60 วัน)",
-            "ทุกอย่างใน Pro รวมถึง:",
             "Image Upscaling (ภาพ HD)",
             "แปลพร้อมกันสูงสุด 50 รูป"
           ]
@@ -494,6 +493,29 @@
     "guideStep1": "Alt+คลิก เพื่อเลือกจุดต้นทาง",
     "guideStep2": "คลิกค้างแล้วลากเพื่อวาดทับ",
     "guideStep3": "กด \"ใช้งาน\" เพื่อบันทึก",
-    "guideTip": "เหมาะสำหรับลบ SFX ที่พาดลายเส้นฉากหลังซับซ้อน"
+    "guideTip": "เหมาะสำหรับลบ SFX ที่พาดลายเส้นฉากหลังซับซ้อน",
+    "watermark": "ลายน้ำ",
+    "watermarkEnable": "เปิดใช้ลายน้ำ",
+    "watermarkApplyTo": "ใช้กับ",
+    "watermarkAllPages": "ทุกหน้า",
+    "watermarkSpecificPages": "เฉพาะหน้าที่เลือก",
+    "watermarkType": "ประเภท",
+    "watermarkText": "ข้อความ",
+    "watermarkImage": "รูปภาพ",
+    "watermarkContent": "เนื้อหา",
+    "watermarkFont": "ฟอนต์",
+    "watermarkFontSize": "ขนาด",
+    "watermarkColor": "สีข้อความ",
+    "watermarkBorder": "เส้นขอบข้อความ",
+    "watermarkBorderColor": "สีเส้นขอบ",
+    "watermarkBorderWidth": "ความหนาเส้นขอบ",
+    "watermarkOpacity": "ความโปร่งใส",
+    "watermarkUpload": "อัปโหลดรูปภาพ",
+    "watermarkPosition": "ตำแหน่ง",
+    "watermarkOffsetX": "ชดเชย X",
+    "watermarkOffsetY": "ชดเชย Y",
+    "watermarkImageWidth": "ความกว้าง",
+    "watermarkImageHeight": "ความสูง",
+    "watermarkPreview": "แสดงตัวอย่างบนผ้าใบ"
   }
 }

@@ -43,6 +43,7 @@ DEFAULT_FREE_PERMISSIONS: dict[str, Any] = {
     "editor.text_border": False,
     "editor.bulk_export_zip": False,
     "editor.upscaling": False,
+    "editor.watermark": False,
 }
 
 
