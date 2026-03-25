@@ -1,0 +1,219 @@
+"""Tests for payment routes — subscription charge uses subscription_payments table."""
+
+import pytest
+from unittest.mock import patch, MagicMock, AsyncMock, call
+
+from api.routes.payment import (
+    create_subscription_charge,
+    check_charge,
+    payment_webhook,
+    CreateSubscriptionChargeRequest,
+)
+from api.services.auth import AuthUser
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _make_user(user_id: str = "user-1") -> AuthUser:
+    return AuthUser(id=user_id, email="user@test.com", is_admin=False)
+
+
+def _mock_supabase_client():
+    """Return a mock Supabase client with chained table().insert/update/select/eq."""
+    client = MagicMock()
+
+    def _table(name):
+        tbl = MagicMock()
+        tbl._table_name = name
+        # Track which table was used
+        client._last_table = name
+        return tbl
+
+    client.table = MagicMock(side_effect=_table)
+    return client
+
+
+# ---------------------------------------------------------------------------
+# Tests for create_subscription_charge
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@patch("api.routes.payment.sub_svc")
+@patch("api.routes.payment.sb")
+@patch("api.routes.payment.payment_svc")
+async def test_subscription_charge_inserts_into_subscription_payments(
+    mock_payment_svc, mock_sb, mock_sub_svc,
+):
+    """The subscription charge route should insert into subscription_payments, not payments."""
+    # Arrange
+    mock_payment_svc.create_subscription_promptpay_charge.return_value = {
+        "charge_id": "chrg_test_123",
+        "amount_satangs": 29900,
+        "qr_code_url": "https://example.com/qr",
+    }
+
+    client = MagicMock()
+    mock_sb._get_client.return_value = client
+
+    # Mock subscriptions lookup
+    sub_select = MagicMock()
+    sub_select.data = {"id": "sub-uuid-1"}
+    client.table("subscriptions").select("id").eq("user_id", "user-1").single().execute.return_value = sub_select
+
+    body = CreateSubscriptionChargeRequest(
+        tier_id="pro",
+        billing_cycle="monthly",
+        payment_method="promptpay",
+    )
+    user = _make_user()
+
+    # Act
+    result = await create_subscription_charge(body, user)
+
+    # Assert — charge_data is returned (not swallowed by DB error)
+    assert result["charge_id"] == "chrg_test_123"
+    assert result["qr_code_url"] == "https://example.com/qr"
+
+    # Assert — subscription_payments table was used (not payments)
+    table_calls = [c.args[0] for c in client.table.call_args_list]
+    assert "subscription_payments" in table_calls
+    assert "payments" not in table_calls
+
+
+@pytest.mark.asyncio
+@patch("api.routes.payment.sub_svc")
+@patch("api.routes.payment.sb")
+@patch("api.routes.payment.payment_svc")
+async def test_subscription_charge_returns_data_even_if_db_insert_fails(
+    mock_payment_svc, mock_sb, mock_sub_svc,
+):
+    """If the DB insert fails, the charge_data should still be returned to the frontend."""
+    mock_payment_svc.create_subscription_promptpay_charge.return_value = {
+        "charge_id": "chrg_test_456",
+        "amount_satangs": 29900,
+        "qr_code_url": "https://example.com/qr",
+    }
+
+    client = MagicMock()
+    mock_sb._get_client.return_value = client
+
+    # Make the subscriptions lookup fail
+    client.table.return_value.select.return_value.eq.return_value.single.return_value.execute.side_effect = Exception("DB error")
+
+    body = CreateSubscriptionChargeRequest(
+        tier_id="pro",
+        billing_cycle="monthly",
+        payment_method="promptpay",
+    )
+    user = _make_user()
+
+    # Act — should NOT raise, charge_data must still be returned
+    result = await create_subscription_charge(body, user)
+
+    assert result["charge_id"] == "chrg_test_456"
+    assert result["qr_code_url"] == "https://example.com/qr"
+
+
+@pytest.mark.asyncio
+@patch("api.routes.payment.sub_svc")
+@patch("api.routes.payment.sb")
+@patch("api.routes.payment.payment_svc")
+async def test_subscription_card_charge_updates_subscription_payments(
+    mock_payment_svc, mock_sb, mock_sub_svc,
+):
+    """Successful card charge should update subscription_payments (not payments)."""
+    mock_payment_svc.create_subscription_card_charge.return_value = {
+        "charge_id": "chrg_test_789",
+        "amount_satangs": 29900,
+        "paid": True,
+    }
+
+    client = MagicMock()
+    mock_sb._get_client.return_value = client
+
+    sub_select = MagicMock()
+    sub_select.data = {"id": "sub-uuid-1"}
+    client.table("subscriptions").select("id").eq("user_id", "user-1").single().execute.return_value = sub_select
+
+    body = CreateSubscriptionChargeRequest(
+        tier_id="pro",
+        billing_cycle="monthly",
+        payment_method="card",
+        card_token="tokn_test_abc",
+    )
+    user = _make_user()
+
+    result = await create_subscription_charge(body, user)
+
+    assert result["paid"] is True
+    # subscribe should be called for immediate card success
+    mock_sub_svc.subscribe.assert_called_once_with("user-1", "pro", "monthly")
+
+
+# ---------------------------------------------------------------------------
+# Tests for webhook
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@patch("api.routes.payment.sub_svc")
+@patch("api.routes.payment.sb")
+@patch("api.routes.payment.payment_svc")
+async def test_webhook_subscription_updates_subscription_payments(
+    mock_payment_svc, mock_sb, mock_sub_svc,
+):
+    """Webhook for subscription payment should update subscription_payments table."""
+    mock_payment_svc.parse_webhook_event.return_value = {
+        "status": "successful",
+        "user_id": "user-1",
+        "charge_id": "chrg_test_sub",
+        "payment_type": "subscription",
+        "tier_id": "pro",
+        "billing_cycle": "monthly",
+        "tokens_to_credit": None,
+    }
+
+    client = MagicMock()
+    mock_sb._get_client.return_value = client
+
+    request = MagicMock()
+    request.json = AsyncMock(return_value={})
+
+    result = await payment_webhook(request)
+
+    # Should update subscription_payments, not payments
+    table_calls = [c.args[0] for c in client.table.call_args_list]
+    assert "subscription_payments" in table_calls
+    mock_sub_svc.subscribe.assert_called_once_with("user-1", "pro", "monthly")
+
+
+@pytest.mark.asyncio
+@patch("api.routes.payment.sub_svc")
+@patch("api.routes.payment.sb")
+@patch("api.routes.payment.payment_svc")
+async def test_webhook_topup_still_uses_payments_table(
+    mock_payment_svc, mock_sb, mock_sub_svc,
+):
+    """Webhook for top-up payment should still use the payments table."""
+    mock_payment_svc.parse_webhook_event.return_value = {
+        "status": "successful",
+        "user_id": "user-1",
+        "charge_id": "chrg_test_topup",
+        "tokens_to_credit": 100,
+        "payment_method": "promptpay",
+    }
+
+    client = MagicMock()
+    mock_sb._get_client.return_value = client
+
+    request = MagicMock()
+    request.json = AsyncMock(return_value={})
+
+    result = await payment_webhook(request)
+
+    # Should use payments table for top-ups
+    table_calls = [c.args[0] for c in client.table.call_args_list]
+    assert "payments" in table_calls
+    assert "subscription_payments" not in table_calls
+    mock_sub_svc.subscribe.assert_not_called()

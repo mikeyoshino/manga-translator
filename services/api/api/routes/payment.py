@@ -1,5 +1,6 @@
 """Payment endpoints: /payment/*"""
 
+import logging
 import os
 
 from fastapi import APIRouter, Request, Depends, HTTPException
@@ -10,6 +11,8 @@ from api.services.auth import AuthUser, get_current_user
 import api.services.payment as payment_svc
 from api.services import subscription as sub_svc
 import manga_shared.supabase_client as sb
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/payment", tags=["payment"])
 
@@ -84,17 +87,23 @@ async def create_subscription_charge(body: CreateSubscriptionChargeRequest, user
         raise HTTPException(status_code=500, detail=f"Payment error: {e}")
 
     client = sb._get_client()
-    client.table("payments").insert({
-        "user_id": user.id,
-        "omise_charge_id": charge_data["charge_id"],
-        "amount_satangs": charge_data["amount_satangs"],
-        "status": "pending",
-        "metadata": {"type": "subscription", "tier_id": body.tier_id, "billing_cycle": body.billing_cycle},
-    }).execute()
+    try:
+        sub_row = client.table("subscriptions").select("id").eq("user_id", user.id).single().execute()
+        client.table("subscription_payments").insert({
+            "user_id": user.id,
+            "subscription_id": sub_row.data["id"],
+            "omise_charge_id": charge_data["charge_id"],
+            "tier_id": body.tier_id,
+            "billing_cycle": body.billing_cycle,
+            "amount_satangs": charge_data["amount_satangs"],
+            "status": "pending",
+        }).execute()
+    except Exception as e:
+        logger.error("Failed to record subscription payment: %s", e)
 
     if body.payment_method == "card" and charge_data.get("paid"):
         sub_svc.subscribe(user.id, body.tier_id, body.billing_cycle)
-        client.table("payments").update({
+        client.table("subscription_payments").update({
             "status": "successful",
         }).eq("omise_charge_id", charge_data["charge_id"]).execute()
 
@@ -113,7 +122,7 @@ async def payment_webhook(request: Request):
     if event["status"] == "successful" and event["user_id"]:
         if event.get("payment_type") == "subscription" and event.get("tier_id"):
             sub_svc.subscribe(event["user_id"], event["tier_id"], event.get("billing_cycle", "monthly"))
-            client.table("payments").update({
+            client.table("subscription_payments").update({
                 "status": "successful",
             }).eq("omise_charge_id", event["charge_id"]).execute()
         elif event["tokens_to_credit"]:
@@ -155,14 +164,16 @@ async def check_charge(body: dict, user: AuthUser = Depends(get_current_user)):
 
     if charge.status == "successful" and charge.paid:
         client = sb._get_client()
-        existing = client.table("payments").select("status").eq("omise_charge_id", charge_id).single().execute()
-        if existing.data and existing.data.get("status") != "successful":
-            metadata = charge.metadata or {}
-            uid = metadata.get("user_id", user.id)
-            if metadata.get("payment_type") == "subscription" and metadata.get("tier_id"):
+        metadata = charge.metadata or {}
+        uid = metadata.get("user_id", user.id)
+        if metadata.get("payment_type") == "subscription" and metadata.get("tier_id"):
+            existing = client.table("subscription_payments").select("status").eq("omise_charge_id", charge_id).single().execute()
+            if existing.data and existing.data.get("status") != "successful":
                 sub_svc.subscribe(uid, metadata["tier_id"], metadata.get("billing_cycle", "monthly"))
-                client.table("payments").update({"status": "successful"}).eq("omise_charge_id", charge_id).execute()
-            else:
+                client.table("subscription_payments").update({"status": "successful"}).eq("omise_charge_id", charge_id).execute()
+        else:
+            existing = client.table("payments").select("status").eq("omise_charge_id", charge_id).single().execute()
+            if existing.data and existing.data.get("status") != "successful":
                 tokens = int(metadata.get("tokens_to_credit", 0))
                 if tokens > 0:
                     sb.credit_tokens(user_id=uid, amount=tokens, type_="topup", reference=charge_id, channel=metadata.get("payment_method", "unknown"))
