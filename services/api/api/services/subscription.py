@@ -24,6 +24,9 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 TIER_CACHE_KEY = "cache:subscription_tiers"
 TIER_CACHE_TTL = 3600  # 1 hour
 
+# Tier ranking — used to prevent downgrades (user must cancel instead)
+TIER_RANK = {"free": 0, "starter": 1, "pro": 2, "premium": 3}
+
 _sync_redis: sync_redis.Redis | None = None
 
 

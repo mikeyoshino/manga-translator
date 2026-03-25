@@ -3,6 +3,7 @@
 import logging
 import os
 
+import sentry_sdk
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -44,6 +45,7 @@ async def create_charge(body: CreateChargeRequest, user: AuthUser = Depends(get_
     except HTTPException:
         raise
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         raise HTTPException(status_code=500, detail=f"Payment error: {e}")
 
     client = sb._get_client()
@@ -72,6 +74,12 @@ async def create_charge(body: CreateChargeRequest, user: AuthUser = Depends(get_
 
 @router.post("/create-subscription-charge")
 async def create_subscription_charge(body: CreateSubscriptionChargeRequest, user: AuthUser = Depends(get_current_user)):
+    # Prevent downgrade — user must cancel instead
+    current_sub = sub_svc.get_user_subscription(user.id)
+    current_tier = current_sub.get("tier_id", "free") if current_sub else "free"
+    if sub_svc.TIER_RANK.get(body.tier_id, 0) < sub_svc.TIER_RANK.get(current_tier, 0):
+        raise HTTPException(status_code=400, detail="Cannot downgrade — cancel your current subscription instead")
+
     try:
         if body.payment_method == "card":
             if not body.card_token:
@@ -84,6 +92,7 @@ async def create_subscription_charge(body: CreateSubscriptionChargeRequest, user
     except HTTPException:
         raise
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         raise HTTPException(status_code=500, detail=f"Payment error: {e}")
 
     client = sb._get_client()
@@ -99,53 +108,63 @@ async def create_subscription_charge(body: CreateSubscriptionChargeRequest, user
             "status": "pending",
         }).execute()
     except Exception as e:
-        logger.error("Failed to record subscription payment: %s", e)
+        logger.error("Failed to record subscription payment: %s", e, exc_info=True)
+        sentry_sdk.capture_exception(e)
 
     if body.payment_method == "card" and charge_data.get("paid"):
-        sub_svc.subscribe(user.id, body.tier_id, body.billing_cycle)
-        client.table("subscription_payments").update({
-            "status": "successful",
-        }).eq("omise_charge_id", charge_data["charge_id"]).execute()
+        try:
+            sub_svc.subscribe(user.id, body.tier_id, body.billing_cycle)
+            client.table("subscription_payments").update({
+                "status": "successful",
+            }).eq("omise_charge_id", charge_data["charge_id"]).execute()
+        except Exception as e:
+            logger.error("Card subscription activation failed: %s", e, exc_info=True)
+            sentry_sdk.capture_exception(e)
 
     return charge_data
 
 
 @router.post("/webhook")
 async def payment_webhook(request: Request):
-    body = await request.json()
-    event = payment_svc.parse_webhook_event(body)
-    if event is None:
-        return JSONResponse({"ok": True, "message": "ignored"})
+    try:
+        body = await request.json()
+        event = payment_svc.parse_webhook_event(body)
+        if event is None:
+            return JSONResponse({"ok": True, "message": "ignored"})
 
-    client = sb._get_client()
+        client = sb._get_client()
 
-    if event["status"] == "successful" and event["user_id"]:
-        if event.get("payment_type") == "subscription" and event.get("tier_id"):
-            sub_svc.subscribe(event["user_id"], event["tier_id"], event.get("billing_cycle", "monthly"))
-            client.table("subscription_payments").update({
-                "status": "successful",
-            }).eq("omise_charge_id", event["charge_id"]).execute()
-        elif event["tokens_to_credit"]:
-            sb.credit_tokens(
-                user_id=event["user_id"],
-                amount=int(event["tokens_to_credit"]),
-                type_="topup",
-                reference=event["charge_id"],
-                channel=event.get("payment_method", "unknown"),
-            )
-            client.table("payments").update({
-                "status": "successful",
-            }).eq("omise_charge_id", event["charge_id"]).execute()
+        if event["status"] == "successful" and event["user_id"]:
+            if event.get("payment_type") == "subscription" and event.get("tier_id"):
+                sub_svc.subscribe(event["user_id"], event["tier_id"], event.get("billing_cycle", "monthly"))
+                client.table("subscription_payments").update({
+                    "status": "successful",
+                }).eq("omise_charge_id", event["charge_id"]).execute()
+            elif event["tokens_to_credit"]:
+                sb.credit_tokens(
+                    user_id=event["user_id"],
+                    amount=int(event["tokens_to_credit"]),
+                    type_="topup",
+                    reference=event["charge_id"],
+                    channel=event.get("payment_method", "unknown"),
+                )
+                client.table("payments").update({
+                    "status": "successful",
+                }).eq("omise_charge_id", event["charge_id"]).execute()
+            else:
+                client.table("payments").update({
+                    "status": "failed",
+                }).eq("omise_charge_id", event["charge_id"]).execute()
         else:
             client.table("payments").update({
                 "status": "failed",
             }).eq("omise_charge_id", event["charge_id"]).execute()
-    else:
-        client.table("payments").update({
-            "status": "failed",
-        }).eq("omise_charge_id", event["charge_id"]).execute()
 
-    return JSONResponse({"ok": True})
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        logger.error("Webhook processing failed: %s", e, exc_info=True)
+        sentry_sdk.capture_exception(e)
+        raise
 
 
 @router.post("/check-charge")
