@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from api.services.auth import AuthUser, get_current_user
 from api.services import subscription as sub_svc
+import manga_shared.supabase_client as sb
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,21 @@ async def subscribe(body: SubscribeRequest, user: AuthUser = Depends(get_current
 
     if body.tier_id not in ("starter", "pro", "premium"):
         raise HTTPException(400, f"Invalid tier: {body.tier_id}")
+
+    # Verify a successful payment exists for this tier
+    client = sb._get_client()
+    payment = (
+        client.table("subscription_payments")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("tier_id", body.tier_id)
+        .eq("status", "successful")
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not payment.data:
+        raise HTTPException(402, "No successful payment found for this tier")
 
     # Prevent downgrade — user must cancel instead
     current_sub = sub_svc.get_user_subscription(user.id)
