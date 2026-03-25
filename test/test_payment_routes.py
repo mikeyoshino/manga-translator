@@ -506,6 +506,66 @@ async def test_subscribe_allows_same_tier(mock_sb, mock_sub_svc):
     mock_sub_svc.subscribe.assert_called_once_with("user-1", "pro", "monthly")
 
 
+# ---------------------------------------------------------------------------
+# Tests for subscribe() token crediting idempotency
+# ---------------------------------------------------------------------------
+
+def test_subscribe_credits_tokens_on_tier_change():
+    """User on 'free' subscribing to 'pro' should credit tokens."""
+    with (
+        patch("api.services.subscription._get_client") as mock_client_fn,
+        patch("api.services.subscription.get_tier") as mock_get_tier,
+        patch("api.services.subscription.get_user_subscription") as mock_get_sub,
+        patch("api.services.subscription.sb") as mock_sb,
+        patch("api.services.subscription.invalidate_tiers_cache"),
+    ):
+        mock_get_tier.return_value = {"monthly_tokens": 2000}
+        mock_get_sub.return_value = {"tier_id": "free"}
+
+        client = MagicMock()
+        mock_client_fn.return_value = client
+        client.table.return_value.upsert.return_value.execute.return_value = MagicMock(data=[{"tier_id": "pro"}])
+        client.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock()
+
+        # Patch feature_guard import inside subscribe()
+        with patch("api.services.feature_guard.invalidate_user_tier_cache"):
+            from api.services.subscription import subscribe as sub_fn
+            sub_fn("user-1", "pro", "monthly")
+
+        mock_sb.credit_tokens.assert_called_once_with(
+            user_id="user-1",
+            amount=2000,
+            type_="subscription",
+            reference="subscribe:pro",
+            channel="system",
+        )
+
+
+def test_subscribe_skips_tokens_on_same_tier():
+    """User already on 'pro', subscribe() called again for 'pro' → no duplicate credit."""
+    with (
+        patch("api.services.subscription._get_client") as mock_client_fn,
+        patch("api.services.subscription.get_tier") as mock_get_tier,
+        patch("api.services.subscription.get_user_subscription") as mock_get_sub,
+        patch("api.services.subscription.sb") as mock_sb,
+        patch("api.services.subscription.invalidate_tiers_cache"),
+    ):
+        mock_get_tier.return_value = {"monthly_tokens": 2000}
+        mock_get_sub.return_value = {"tier_id": "pro"}  # Already on pro
+
+        client = MagicMock()
+        mock_client_fn.return_value = client
+        client.table.return_value.upsert.return_value.execute.return_value = MagicMock(data=[{"tier_id": "pro"}])
+        client.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock()
+
+        with patch("api.services.feature_guard.invalidate_user_tier_cache"):
+            from api.services.subscription import subscribe as sub_fn
+            sub_fn("user-1", "pro", "monthly")
+
+        # credit_tokens should NOT be called — same tier, no credit
+        mock_sb.credit_tokens.assert_not_called()
+
+
 @pytest.mark.asyncio
 @patch("api.routes.payment.sub_svc")
 @patch("api.routes.payment.sb")
