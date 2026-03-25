@@ -186,6 +186,11 @@ def subscribe(
     if billing_cycle not in ("monthly", "annual"):
         raise ValueError(f"Invalid billing cycle: {billing_cycle}")
 
+    # Check current tier to avoid duplicate token crediting on repeated calls
+    existing_sub = get_user_subscription(user_id)
+    old_tier = existing_sub.get("tier_id", "free") if existing_sub else "free"
+    should_credit = old_tier != tier_id
+
     client = _get_client()
     now = datetime.now(timezone.utc)
 
@@ -219,9 +224,9 @@ def subscribe(
     # Update profile tier_id
     client.table("profiles").update({"tier_id": tier_id}).eq("id", user_id).execute()
 
-    # Credit initial subscription tokens
+    # Only credit tokens on actual tier change (prevents duplicates from multiple callers)
     monthly_tokens = tier.get("monthly_tokens", 0)
-    if monthly_tokens > 0:
+    if monthly_tokens > 0 and should_credit:
         sb.credit_tokens(
             user_id=user_id,
             amount=monthly_tokens,
@@ -235,8 +240,8 @@ def subscribe(
     invalidate_user_tier_cache(user_id)
 
     logger.info(
-        "User %s subscribed to %s (%s), credited %d tokens",
-        user_id, tier_id, billing_cycle, monthly_tokens,
+        "User %s subscribed to %s (%s), credited %d tokens (tier_changed=%s)",
+        user_id, tier_id, billing_cycle, monthly_tokens, should_credit,
     )
 
     return result.data[0] if result.data else sub_data
