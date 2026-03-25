@@ -54,6 +54,12 @@ async def subscribe(body: SubscribeRequest, user: AuthUser = Depends(get_current
     if body.tier_id not in ("starter", "pro", "premium"):
         raise HTTPException(400, f"Invalid tier: {body.tier_id}")
 
+    # Prevent downgrade — user must cancel instead
+    current_sub = sub_svc.get_user_subscription(user.id)
+    current_tier = current_sub.get("tier_id", "free") if current_sub else "free"
+    if sub_svc.TIER_RANK.get(body.tier_id, 0) < sub_svc.TIER_RANK.get(current_tier, 0):
+        raise HTTPException(400, "Cannot downgrade — cancel your current subscription instead")
+
     try:
         result = sub_svc.subscribe(user.id, body.tier_id, body.billing_cycle)
         return {"ok": True, "subscription": result}

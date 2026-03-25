@@ -9,6 +9,7 @@ from api.routes.payment import (
     payment_webhook,
     CreateSubscriptionChargeRequest,
 )
+from api.routes.subscription import subscribe, SubscribeRequest
 from api.services.auth import AuthUser
 
 
@@ -18,6 +19,14 @@ from api.services.auth import AuthUser
 
 def _make_user(user_id: str = "user-1") -> AuthUser:
     return AuthUser(id=user_id, email="user@test.com", is_admin=False)
+
+
+def _setup_tier_rank(mock_sub_svc, current_tier=None):
+    """Configure TIER_RANK and get_user_subscription on a mocked sub_svc."""
+    mock_sub_svc.TIER_RANK = {"free": 0, "starter": 1, "pro": 2, "premium": 3}
+    mock_sub_svc.get_user_subscription.return_value = (
+        {"tier_id": current_tier} if current_tier else None
+    )
 
 
 def _mock_supabase_client():
@@ -61,6 +70,7 @@ async def test_subscription_charge_inserts_into_subscription_payments(
     sub_select = MagicMock()
     sub_select.data = {"id": "sub-uuid-1"}
     client.table("subscriptions").select("id").eq("user_id", "user-1").single().execute.return_value = sub_select
+    _setup_tier_rank(mock_sub_svc)
 
     body = CreateSubscriptionChargeRequest(
         tier_id="pro",
@@ -99,6 +109,8 @@ async def test_subscription_charge_returns_data_even_if_db_insert_fails(
     client = MagicMock()
     mock_sb._get_client.return_value = client
 
+    _setup_tier_rank(mock_sub_svc)
+
     # Make the subscriptions lookup fail
     client.table.return_value.select.return_value.eq.return_value.single.return_value.execute.side_effect = Exception("DB error")
 
@@ -136,6 +148,7 @@ async def test_subscription_card_charge_updates_subscription_payments(
     sub_select = MagicMock()
     sub_select.data = {"id": "sub-uuid-1"}
     client.table("subscriptions").select("id").eq("user_id", "user-1").single().execute.return_value = sub_select
+    _setup_tier_rank(mock_sub_svc)
 
     body = CreateSubscriptionChargeRequest(
         tier_id="pro",
@@ -217,3 +230,83 @@ async def test_webhook_topup_still_uses_payments_table(
     assert "payments" in table_calls
     assert "subscription_payments" not in table_calls
     mock_sub_svc.subscribe.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Tests for subscription downgrade prevention
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@patch("api.routes.subscription.sub_svc")
+async def test_subscribe_rejects_downgrade(mock_sub_svc):
+    """User on 'pro' trying to subscribe to 'starter' should get 400."""
+    _setup_tier_rank(mock_sub_svc, current_tier="pro")
+
+    body = SubscribeRequest(tier_id="starter", billing_cycle="monthly")
+    user = _make_user()
+
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as exc_info:
+        await subscribe(body, user)
+
+    assert exc_info.value.status_code == 400
+    assert "Cannot downgrade" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+@patch("api.routes.subscription.sub_svc")
+async def test_subscribe_allows_upgrade(mock_sub_svc):
+    """User on 'starter' upgrading to 'pro' should succeed."""
+    _setup_tier_rank(mock_sub_svc, current_tier="starter")
+    mock_sub_svc.subscribe.return_value = {"tier_id": "pro", "status": "active"}
+
+    body = SubscribeRequest(tier_id="pro", billing_cycle="monthly")
+    user = _make_user()
+
+    result = await subscribe(body, user)
+
+    assert result["ok"] is True
+    mock_sub_svc.subscribe.assert_called_once_with("user-1", "pro", "monthly")
+
+
+@pytest.mark.asyncio
+@patch("api.routes.subscription.sub_svc")
+async def test_subscribe_allows_same_tier(mock_sub_svc):
+    """User on 'pro' re-subscribing to 'pro' (renewal) should succeed."""
+    _setup_tier_rank(mock_sub_svc, current_tier="pro")
+    mock_sub_svc.subscribe.return_value = {"tier_id": "pro", "status": "active"}
+
+    body = SubscribeRequest(tier_id="pro", billing_cycle="monthly")
+    user = _make_user()
+
+    result = await subscribe(body, user)
+
+    assert result["ok"] is True
+    mock_sub_svc.subscribe.assert_called_once_with("user-1", "pro", "monthly")
+
+
+@pytest.mark.asyncio
+@patch("api.routes.payment.sub_svc")
+@patch("api.routes.payment.sb")
+@patch("api.routes.payment.payment_svc")
+async def test_create_subscription_charge_rejects_downgrade(
+    mock_payment_svc, mock_sb, mock_sub_svc,
+):
+    """User on 'premium' trying to create charge for 'pro' should get 400."""
+    _setup_tier_rank(mock_sub_svc, current_tier="premium")
+
+    body = CreateSubscriptionChargeRequest(
+        tier_id="pro",
+        billing_cycle="monthly",
+        payment_method="promptpay",
+    )
+    user = _make_user()
+
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as exc_info:
+        await create_subscription_charge(body, user)
+
+    assert exc_info.value.status_code == 400
+    assert "Cannot downgrade" in exc_info.value.detail
+    # No charge should have been created
+    mock_payment_svc.create_subscription_promptpay_charge.assert_not_called()

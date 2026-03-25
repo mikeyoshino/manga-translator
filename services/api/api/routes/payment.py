@@ -72,6 +72,12 @@ async def create_charge(body: CreateChargeRequest, user: AuthUser = Depends(get_
 
 @router.post("/create-subscription-charge")
 async def create_subscription_charge(body: CreateSubscriptionChargeRequest, user: AuthUser = Depends(get_current_user)):
+    # Prevent downgrade — user must cancel instead
+    current_sub = sub_svc.get_user_subscription(user.id)
+    current_tier = current_sub.get("tier_id", "free") if current_sub else "free"
+    if sub_svc.TIER_RANK.get(body.tier_id, 0) < sub_svc.TIER_RANK.get(current_tier, 0):
+        raise HTTPException(status_code=400, detail="Cannot downgrade — cancel your current subscription instead")
+
     try:
         if body.payment_method == "card":
             if not body.card_token:
