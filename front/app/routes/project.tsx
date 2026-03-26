@@ -36,9 +36,7 @@ import {
 import {
   imageMimeTypes,
   textDetectorOptions,
-  inpainterOptions,
   detectionResolutionOptions,
-  inpaintingSizeOptions,
   type LocalizedOption,
 } from "@/config";
 import { loadSettings, saveSettings } from "@/utils/localStorage";
@@ -121,11 +119,6 @@ function ProjectContent() {
   const [renderTextDirection, setRenderTextDirection] = useState(savedSettings.renderTextDirection || "auto");
   const translator: TranslatorKey = "openai";
   const [targetLanguage, setTargetLanguage] = useState(savedSettings.targetLanguage || "THA");
-  const [inpaintingSize, setInpaintingSize] = useState(savedSettings.inpaintingSize || "2048");
-  const [customUnclipRatio, setCustomUnclipRatio] = useState<number>(savedSettings.customUnclipRatio ?? 2.3);
-  const [customBoxThreshold, setCustomBoxThreshold] = useState<number>(savedSettings.customBoxThreshold ?? 0.7);
-  const [maskDilationOffset, setMaskDilationOffset] = useState<number>(savedSettings.maskDilationOffset ?? 30);
-  const [inpainter, setInpainter] = useState(savedSettings.inpainter || "lama_large");
   const [skipOutsideBubble, setSkipOutsideBubble] = useState(savedSettings.skipOutsideBubble ?? false);
   const [configOpen, setConfigOpen] = useState(false);
 
@@ -138,11 +131,10 @@ function ProjectContent() {
   useEffect(() => {
     const settings: TranslationSettings = {
       detectionResolution, textDetector, renderTextDirection, translator,
-      targetLanguage, inpaintingSize, customUnclipRatio, customBoxThreshold,
-      maskDilationOffset, inpainter, skipOutsideBubble,
+      targetLanguage, skipOutsideBubble,
     };
     saveSettings(settings);
-  }, [detectionResolution, textDetector, renderTextDirection, targetLanguage, inpaintingSize, customUnclipRatio, customBoxThreshold, maskDilationOffset, inpainter, skipOutsideBubble]);
+  }, [detectionResolution, textDetector, renderTextDirection, targetLanguage, skipOutsideBubble]);
 
   // Clipboard paste
   useEffect(() => {
@@ -286,12 +278,12 @@ function ProjectContent() {
   };
 
   const buildTranslationConfig = (): string => JSON.stringify({
-    detector: { detector: textDetector, detection_size: detectionResolution, box_threshold: customBoxThreshold, unclip_ratio: customUnclipRatio },
+    detector: { detector: textDetector, detection_size: detectionResolution, box_threshold: 0.7, unclip_ratio: 2.3 },
     render: { direction: renderTextDirection },
     translator: { translator, target_lang: targetLanguage },
-    inpainter: { inpainter, inpainting_size: inpaintingSize },
+    inpainter: { inpainter: "lama_large", inpainting_size: "2048" },
     ocr: { ignore_bubble: skipOutsideBubble ? 10 : 0 },
-    mask_dilation_offset: maskDilationOffset,
+    mask_dilation_offset: 30,
   });
 
   const updateFileStatus = (fileId: string, update: Partial<FileStatus>) => {
@@ -686,13 +678,6 @@ function ProjectContent() {
                 <Layers className="w-3.5 h-3.5 text-indigo-500" />
                 <span className="text-[11px] font-bold text-slate-400 uppercase">{i.visuals}</span>
               </div>
-              <SliderInput label={i.boxThreshold} value={customBoxThreshold} min={0} max={1} step={0.01} onChange={setCustomBoxThreshold} hint={i.hintBoxThreshold} />
-              <SliderInput label={i.unclipRatio} value={customUnclipRatio} min={0} max={5} step={0.01} onChange={setCustomUnclipRatio} hint={i.hintUnclipRatio} />
-              <SliderInput label={i.maskDilation} value={maskDilationOffset} min={0} max={100} step={1} onChange={setMaskDilationOffset} hint={i.hintMaskDilation} />
-              <SidebarSelect label={i.inpainter} value={inpainter} onChange={setInpainter}
-                options={inpainterOptions} locale={locale} hint={i.hintInpainter} />
-              <SidebarSelect label={i.inpaintingSize} value={inpaintingSize} onChange={setInpaintingSize}
-                options={inpaintingSizeOptions} locale={locale} hint={i.hintInpaintingSize} />
               <label className="flex items-center gap-3 cursor-pointer group">
                 <input type="checkbox" checked={skipOutsideBubble} onChange={(e) => setSkipOutsideBubble(e.target.checked)}
                   className="w-4 h-4 rounded border-slate-300 text-indigo-500 focus:ring-indigo-400" />
@@ -708,8 +693,7 @@ function ProjectContent() {
               <button
                 onClick={() => {
                   setDetectionResolution("1536"); setTextDetector("default"); setRenderTextDirection("auto");
-                  setTargetLanguage("THA"); setInpaintingSize("2048"); setCustomUnclipRatio(2.3);
-                  setCustomBoxThreshold(0.7); setMaskDilationOffset(30); setInpainter("lama_large"); setSkipOutsideBubble(false);
+                  setTargetLanguage("THA"); setSkipOutsideBubble(false);
                 }}
                 className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
               >
@@ -769,25 +753,6 @@ function SidebarSelect({ label, value, onChange, options, locale, hint }: {
           </ListboxOptions>
         </div>
       </Listbox>
-    </div>
-  );
-}
-
-function SliderInput({ label, value, min, max, step, onChange, hint }: {
-  label: string; value: number; min: number; max: number; step: number;
-  onChange: (v: number) => void; hint?: string;
-}) {
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between items-center">
-        <label className="text-xs font-semibold text-slate-600">{label}{hint && <InfoTooltip text={hint} />}</label>
-        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 rounded">{value}</span>
-      </div>
-      <input
-        type="range" min={min} max={max} step={step}
-        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-        value={value} onChange={(e) => onChange(parseFloat(e.target.value))}
-      />
     </div>
   );
 }

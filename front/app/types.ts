@@ -110,11 +110,6 @@ export interface TranslationSettings {
   renderTextDirection: string;
   translator: TranslatorKey;
   targetLanguage: string;
-  inpaintingSize: string;
-  customUnclipRatio: number;
-  customBoxThreshold: number;
-  maskDilationOffset: number;
-  inpainter: string;
   skipOutsideBubble: boolean;
 }
 
