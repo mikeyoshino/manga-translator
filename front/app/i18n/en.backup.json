@@ -11,7 +11,6 @@
       "lang": "TH"
     },
     "hero": {
-      "badge": "AI-Powered Manga Translation",
       "titleLine1": "Translate Manga in ",
       "titleHighlight": "Seconds",
       "titleLine2": "",
@@ -22,47 +21,37 @@
     },
     "steps": {
       "title": "How It Works",
-      "items": [
-        { "title": "Upload", "desc": "Drop your manga pages — batch upload for better context" },
-        { "title": "Detect & Read", "desc": "AI finds every text bubble and reads the original" },
-        { "title": "Clean & Inpaint", "desc": "Original text removed, background art restored" },
-        { "title": "AI Translate", "desc": "Context-aware translation powered by GPT-4o" },
-        { "title": "Edit & Export", "desc": "Fine-tune in the editor, then download" }
+      "s1": { "title": "1. Upload", "desc": "Drop your manga pages (supports batch upload for better context)" },
+      "s2": { "title": "2. AI Translates", "desc": "Our pipeline detects text, removes it cleanly, translates, and renders new text" },
+      "s3": { "title": "3. Edit & Export", "desc": "Fine-tune translations in the built-in editor, then download" }
+    },
+    "pipeline": {
+      "title": "AI Pipeline Features (Under the Hood)",
+      "steps": [
+        { "name": "Text Detection", "desc": "AI locates every text bubble and sound effect using DBNET/CTD/CRAFT models" },
+        { "name": "OCR Recognition", "desc": "Reads the original text with specialized manga OCR models" },
+        { "name": "Smart Inpainting", "desc": "Removes original text and reconstructs the background art seamlessly (LaMa AI)" },
+        { "name": "AI Translation", "desc": "Translates with context awareness using GPT-4o — understands manga dialogue, slang, and tone" },
+        { "name": "Text Rendering", "desc": "Places translated text with matched font size, color, and position" }
       ]
     },
     "features": {
       "title": "Pro Tools, Easy to Use",
+      "editor": "Editor Tools",
+      "project": "Project Management",
       "items": [
-        {
-          "title": "Visual Text Editor",
-          "desc": "Full control over every text block",
-          "bullets": ["Font, size, color, alignment", "Bold, italic, text stroke", "Pen, eraser & drawing tools"]
-        },
-        {
-          "title": "AI-Powered Tools",
-          "desc": "Smart tools for clean results",
-          "bullets": ["Magic Remover — AI inpainting", "Manual Translate — re-translate regions", "Clone Stamp — pixel-level repair"]
-        },
-        {
-          "title": "Batch Translation",
-          "desc": "Translate multiple pages at once",
-          "bullets": ["Upload batches for context", "AI understands story flow"]
-        },
-        {
-          "title": "Project Management",
-          "desc": "Organize chapters and volumes",
-          "bullets": ["Group pages into projects", "Up to 5 active projects"]
-        },
-        {
-          "title": "Cloud & Auto-Save",
-          "desc": "Never lose your work",
-          "bullets": ["Auto-saves as you edit", "Access from any device"]
-        },
-        {
-          "title": "Batch Export",
-          "desc": "Download your results fast",
-          "bullets": ["Single image or full ZIP", "High-quality output"]
-        }
+        { "title": "Visual Text Editor", "desc": "Adjust font, size, color, position, alignment, bold/italic, text stroke for every text block" },
+        { "title": "Magic Remover", "desc": "Paint over leftover text or artifacts and AI inpaints them away" },
+        { "title": "Manual Translate", "desc": "Select a missed region and run AI translation on just that area" },
+        { "title": "Clone Stamp", "desc": "Pixel-level background repair by cloning from nearby areas" },
+        { "title": "Pen & Eraser", "desc": "Freehand drawing for annotations or touch-ups" },
+        { "title": "Undo/Redo", "desc": "Full history for every action" },
+        { "title": "Batch Export", "desc": "Download single images or all pages as ZIP" },
+        { "title": "Organize by Project", "desc": "Group manga chapters into projects (up to 5 active)" },
+        { "title": "Batch Translation", "desc": "Upload multiple pages and translate all at once" },
+        { "title": "Context-Aware AI", "desc": "Multi-page upload helps AI understand story context for more accurate translations" },
+        { "title": "Cloud Storage", "desc": "Results saved with auto-expiry, accessible from any device" },
+        { "title": "Auto-Save", "desc": "Edits saved automatically as you work" }
       ]
     },
     "pricing": {
@@ -149,9 +138,9 @@
     "trust": {
       "title": "Trust & Security",
       "items": [
-        "Your images are processed securely and never shared with third parties",
-        "GPU-powered processing — most pages translated in under 30 seconds",
-        "Auto-saves to cloud, accessible from any device"
+        "httpOnly cookie auth — tokens never exposed to JavaScript",
+        "Sentry error monitoring — issues caught and resolved fast",
+        "GPU-powered workers — fast translation even at high resolution"
       ]
     },
     "footer": {

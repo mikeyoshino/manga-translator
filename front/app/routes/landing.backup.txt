@@ -9,13 +9,21 @@ import {
   Sparkles,
   Download,
   Search,
+  ScanLine,
   Eraser,
+  Type,
   Wand2,
+  MousePointerClick,
+  Copy,
+  Paintbrush,
+  RotateCcw,
   FolderTree,
   Layers,
   Cloud,
+  Save,
   CheckCircle2,
   ShieldCheck,
+  Zap,
   ArrowRight,
   Image as ImageIcon,
   Edit3,
@@ -63,11 +71,14 @@ export function meta({ params }: Route.MetaArgs) {
   ];
 }
 
-// --- Icon map for steps ---
-const stepIcons: LucideIcon[] = [ImageIcon, Search, Eraser, Languages, Download];
+// --- Icon map for pipeline steps (avoids JSX in data) ---
+const pipelineIcons: LucideIcon[] = [Search, ScanLine, Eraser, Languages, Type];
 
 // --- Icon map for feature items ---
-const featureIcons: LucideIcon[] = [Edit3, Wand2, Layers, FolderTree, Cloud, Download];
+const featureIcons: LucideIcon[] = [
+  Edit3, Wand2, MousePointerClick, Copy, Paintbrush, RotateCcw,
+  Download, FolderTree, Layers, Zap, Cloud, Save,
+];
 
 export default function LandingPage() {
   const lang = useLocale();
@@ -76,6 +87,16 @@ export default function LandingPage() {
   const [sliderPosition, setSliderPosition] = useState(50);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const t = useT().landing;
+
+  const handleMove = (e: React.MouseEvent<HTMLDivElement> | React.Touch) => {
+    const target =
+      "currentTarget" in e ? e.currentTarget : (e as React.Touch).target;
+    const rect = (target as HTMLElement).getBoundingClientRect();
+    const clientX = "clientX" in e ? e.clientX : 0;
+    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+    const percent = (x / rect.width) * 100;
+    setSliderPosition(percent);
+  };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -103,16 +124,14 @@ export default function LandingPage() {
           .bg-dots {
             background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
             background-size: 24px 24px;
-            opacity: 0.15;
+            opacity: 0.3;
           }
         `}
       </style>
 
-      {/* Decorative Background Elements — gradient mesh */}
+      {/* Decorative Background Elements */}
       <div className="absolute inset-0 bg-dots z-0 pointer-events-none" />
-      <div className="absolute -top-40 -right-40 w-[700px] h-[700px] bg-indigo-100/40 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute top-60 -left-60 w-[500px] h-[500px] bg-purple-100/30 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute top-[40%] right-[20%] w-[400px] h-[400px] bg-slate-100/50 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-50 rounded-full blur-[120px] -z-10 pointer-events-none" />
 
       {/* Navigation */}
       <nav className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
@@ -157,9 +176,9 @@ export default function LandingPage() {
           <div className="space-y-8">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 font-medium text-sm rounded-full border border-indigo-100">
               <Sparkles className="w-4 h-4" />
-              <span>{t.hero.badge}</span>
+              <span>AI-Powered Manga Translation</span>
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold leading-[1.1] tracking-tight text-slate-900">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-[1.15] text-slate-900">
               {t.hero.titleLine1}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
                 {t.hero.titleHighlight}
@@ -241,117 +260,133 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* How It Works — Horizontal Stepper */}
+      {/* How It Works */}
       <section className="py-20 bg-white relative z-10">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-slate-900">
               {t.steps.title}
             </h2>
           </div>
 
-          {/* Desktop: horizontal stepper */}
-          <div className="hidden md:flex items-start justify-between relative">
-            {/* Dashed connecting line */}
-            <div className="absolute top-7 left-[10%] right-[10%] h-px border-t-2 border-dashed border-slate-200 z-0" />
+          <div className="grid md:grid-cols-3 gap-8 relative">
+            {/* Connecting line for desktop */}
+            <div className="hidden md:block absolute top-[2.5rem] left-[20%] right-[20%] h-[1px] bg-slate-200 z-0" />
 
-            {t.steps.items.map((step, idx) => {
-              const Icon = stepIcons[idx];
-              return (
-                <div
-                  key={idx}
-                  className="relative z-10 flex flex-col items-center text-center w-1/5"
-                >
-                  <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-4 shadow-sm">
-                    <Icon className="w-6 h-6" />
-                  </div>
-                  <span className="text-xs font-bold text-indigo-600 mb-1">
-                    {idx + 1}
-                  </span>
-                  <h3 className="text-sm font-semibold text-slate-900 mb-1">
-                    {step.title}
-                  </h3>
-                  <p className="text-xs text-slate-500 leading-relaxed max-w-[160px]">
-                    {step.desc}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
+            <div className="relative z-10 flex flex-col items-center text-center space-y-4">
+              <div className="w-20 h-20 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-600 mb-2 ring-1 ring-slate-100">
+                <ImageIcon className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-semibold text-slate-900">
+                {t.steps.s1.title}
+              </h3>
+              <p className="text-slate-500 text-sm leading-relaxed">
+                {t.steps.s1.desc}
+              </p>
+            </div>
 
-          {/* Mobile: vertical timeline */}
-          <div className="md:hidden flex flex-col relative pl-10">
-            {/* Vertical dashed line */}
-            <div className="absolute top-3 bottom-3 left-[1.15rem] w-px border-l-2 border-dashed border-slate-200 z-0" />
+            <div className="relative z-10 flex flex-col items-center text-center space-y-4">
+              <div className="w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mb-2 shadow-lg shadow-indigo-200">
+                <Sparkles className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-semibold text-slate-900">
+                {t.steps.s2.title}
+              </h3>
+              <p className="text-slate-500 text-sm leading-relaxed">
+                {t.steps.s2.desc}
+              </p>
+            </div>
 
-            {t.steps.items.map((step, idx) => {
-              const Icon = stepIcons[idx];
-              return (
-                <div key={idx} className="relative z-10 flex items-start gap-4 mb-8 last:mb-0">
-                  <div className="absolute -left-10 w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm flex-shrink-0">
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-indigo-600">
-                      {idx + 1}
-                    </span>
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      {step.title}
-                    </h3>
-                    <p className="text-xs text-slate-500 leading-relaxed mt-0.5">
-                      {step.desc}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
+            <div className="relative z-10 flex flex-col items-center text-center space-y-4">
+              <div className="w-20 h-20 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-600 mb-2 ring-1 ring-slate-100">
+                <Download className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-semibold text-slate-900">
+                {t.steps.s3.title}
+              </h3>
+              <p className="text-slate-500 text-sm leading-relaxed">
+                {t.steps.s3.desc}
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Features Grid — Bento Layout */}
-      <section className="py-24 bg-slate-50/50 relative z-10 border-y border-slate-100">
+      {/* AI Pipeline */}
+      <section className="py-24 bg-slate-50 relative z-10 border-y border-slate-100">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-slate-900">
+              {t.pipeline.title}
+            </h2>
+          </div>
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="divide-y divide-slate-100">
+              {t.pipeline.steps.map((step, idx) => {
+                const Icon = pipelineIcons[idx];
+                return (
+                  <div
+                    key={idx}
+                    className="flex items-start gap-5 p-6 sm:p-8 hover:bg-slate-50/50 transition-colors"
+                  >
+                    <div className="flex-shrink-0 w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+                      <Icon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">
+                          Step {idx + 1}
+                        </span>
+                        <h4 className="text-lg font-semibold text-slate-900">
+                          {step.name}
+                        </h4>
+                      </div>
+                      <p className="text-slate-500 leading-relaxed text-sm">
+                        {step.desc}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Grid */}
+      <section className="py-24 bg-white relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-slate-900">
               {t.features.title}
             </h2>
+            <div className="flex justify-center gap-3 mt-6">
+              <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-slate-600 text-sm font-medium">
+                <Edit3 className="w-4 h-4" /> {t.features.editor}
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-slate-600 text-sm font-medium">
+                <FolderTree className="w-4 h-4" /> {t.features.project}
+              </span>
+            </div>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {t.features.items.map((item, idx) => {
               const Icon = featureIcons[idx];
-              const isHero = idx === 0;
               return (
                 <div
                   key={idx}
-                  className={`bg-white/70 backdrop-blur-sm p-7 rounded-3xl border border-slate-100 hover:border-indigo-100 hover:shadow-lg hover:-translate-y-1 transition-all group ${
-                    isHero ? "lg:col-span-2" : ""
-                  }`}
+                  className="bg-white p-6 rounded-2xl border border-slate-100 hover:border-indigo-100 hover:shadow-md transition-all group"
                 >
-                  <div
-                    className={`w-11 h-11 rounded-xl flex items-center justify-center mb-4 transition-colors ${
-                      isHero
-                        ? "bg-indigo-100 text-indigo-600"
-                        : "bg-slate-50 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600"
-                    }`}
-                  >
+                  <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600 mb-4 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
                     <Icon className="w-5 h-5" />
                   </div>
-                  <h4 className="text-lg font-semibold text-slate-900 mb-1">
+                  <h4 className="text-lg font-semibold text-slate-900 mb-2">
                     {item.title}
                   </h4>
-                  <p className="text-slate-500 text-sm leading-relaxed mb-3">
+                  <p className="text-slate-500 text-sm leading-relaxed">
                     {item.desc}
                   </p>
-                  <ul className="space-y-1">
-                    {item.bullets.map((bullet, bIdx) => (
-                      <li key={bIdx} className="flex items-center gap-2 text-xs text-slate-500">
-                        <Check className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
-                        {bullet}
-                      </li>
-                    ))}
-                  </ul>
                 </div>
               );
             })}
@@ -423,18 +458,18 @@ export default function LandingPage() {
                       ? tier.monthlyPrice
                       : (tier.annualMonthly ?? tier.monthlyPrice)}
                   </span>
-                  {tier.monthlyPrice !== "\u0E3F0" && (
+                  {tier.monthlyPrice !== "฿0" && (
                     <span className={`text-sm ${tier.popular ? "text-indigo-200" : "text-slate-400"}`}>
                       {t.pricing.perMonth}
                     </span>
                   )}
                 </div>
-                {billingCycle === "annual" && tier.annualPrice !== "\u0E3F0" && (
+                {billingCycle === "annual" && tier.annualPrice !== "฿0" && (
                   <p className={`text-xs mb-3 ${tier.popular ? "text-indigo-200" : "text-slate-400"}`}>
                     {tier.annualPrice}{t.pricing.perYear}
                   </p>
                 )}
-                {(billingCycle === "monthly" || tier.annualPrice === "\u0E3F0") && (
+                {(billingCycle === "monthly" || tier.annualPrice === "฿0") && (
                   <div className="mb-3" />
                 )}
 
