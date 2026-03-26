@@ -94,10 +94,9 @@ def refine_mask(rgbimg, rawmask):
     return crf_mask
 
 def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilateral], keep_threshold = 1e-2, dilation_offset = 0,kernel_size=3):
-    bboxes = [txtln.aabb.xywh for txtln in textlines]
     polys = [Polygon(txtln.pts) for txtln in textlines]
-    for (x, y, w, h) in bboxes:
-        cv2.rectangle(mask, (x, y), (x + w, y + h), (0), 1)
+    # Preserve original mask for low-coverage fallback (before any modification)
+    original_mask = mask.copy()
     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask)
 
     M = len(textlines)
@@ -142,7 +141,7 @@ def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilater
             #     unit /= 2
             # if avg == 0:
             # print('no intersect', area1, '>=', area2, dist_mat[label, avg], '>=', 0.5 * unit)
-            if dist_mat[label, avg] >= 0.5 * unit:
+            if dist_mat[label, avg] >= 0.75 * unit:
                 # print(dist_mat[label])
                 # print('CONTINUE')
                 continue
@@ -160,7 +159,28 @@ def complete_mask(img: np.ndarray, mask: np.ndarray, textlines: List[Quadrilater
 
     if not valid:
         return None
-    
+
+    # Fill fallback: when CC matching provides low mask coverage for a text region,
+    # supplement with all original mask pixels inside the text polygon.
+    # This ensures near-complete text removal across manga, manhwa, and comics.
+    for tl_idx in range(M):
+        poly_mask = np.zeros_like(mask)
+        pts = textlines[tl_idx].pts.astype(np.int32)
+        cv2.fillPoly(poly_mask, [pts], 255)
+        current_coverage = np.sum(textline_ccs[tl_idx] > 0)
+        poly_area = np.sum(poly_mask > 0)
+        if poly_area > 0 and current_coverage / poly_area < 0.3:
+            textline_ccs[tl_idx] = cv2.bitwise_or(
+                textline_ccs[tl_idx],
+                cv2.bitwise_and(original_mask, poly_mask)
+            )
+            # Update bounding rect to cover the polygon area
+            px, py, pw, ph = cv2.boundingRect(pts)
+            textline_rects[tl_idx, 0] = min(textline_rects[tl_idx, 0], px)
+            textline_rects[tl_idx, 1] = min(textline_rects[tl_idx, 1], py)
+            textline_rects[tl_idx, 2] = max(textline_rects[tl_idx, 2], px + pw)
+            textline_rects[tl_idx, 3] = max(textline_rects[tl_idx, 3], py + ph)
+
     # tblr to xywh
     textline_rects[:, 2] -= textline_rects[:, 0]
     textline_rects[:, 3] -= textline_rects[:, 1]

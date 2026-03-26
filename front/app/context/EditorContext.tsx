@@ -502,8 +502,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
         detector: {
           detector: savedSettings.textDetector || "default",
           detection_size: savedSettings.detectionResolution || "1536",
-          box_threshold: savedSettings.customBoxThreshold ?? 0.7,
-          unclip_ratio: savedSettings.customUnclipRatio ?? 2.3,
+          box_threshold: 0.7,
+          unclip_ratio: 2.3,
         },
         render: { direction: savedSettings.renderTextDirection || "auto" },
         translator: {
@@ -511,11 +511,11 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
           target_lang: savedSettings.targetLanguage || "THA",
         },
         inpainter: {
-          inpainter: savedSettings.inpainter || "lama_large",
-          inpainting_size: savedSettings.inpaintingSize || "2048",
+          inpainter: "lama_large",
+          inpainting_size: "2048",
         },
         ocr: { ignore_bubble: savedSettings.skipOutsideBubble ? 10 : 0 },
-        mask_dilation_offset: savedSettings.maskDilationOffset ?? 30,
+        mask_dilation_offset: 30,
       });
 
       const fd = new FormData();
