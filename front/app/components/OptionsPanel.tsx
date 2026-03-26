@@ -6,9 +6,7 @@ import {
   languageOptions,
   detectionResolutions,
   textDetectorOptions,
-  inpaintingSizes,
 } from "@/config";
-import { LabeledInput } from "@/components/LabeledInput";
 import { LabeledSelect } from "@/components/LabeledSelect";
 
 type Props = {
@@ -17,20 +15,12 @@ type Props = {
   renderTextDirection: string;
   translator: TranslatorKey;
   targetLanguage: string;
-  inpaintingSize: string;
-  customUnclipRatio: number;
-  customBoxThreshold: number;
-  maskDilationOffset: number;
 
   setDetectionResolution: (val: string) => void;
   setTextDetector: (val: string) => void;
   setRenderTextDirection: (val: string) => void;
   setTranslator: (val: TranslatorKey) => void;
   setTargetLanguage: (val: string) => void;
-  setInpaintingSize: (val: string) => void;
-  setCustomUnclipRatio: (val: number) => void;
-  setCustomBoxThreshold: (val: number) => void;
-  setMaskDilationOffset: (val: number) => void;
 };
 
 export const OptionsPanel: React.FC<Props> = ({
@@ -39,19 +29,11 @@ export const OptionsPanel: React.FC<Props> = ({
   renderTextDirection,
   translator,
   targetLanguage,
-  inpaintingSize,
-  customUnclipRatio,
-  customBoxThreshold,
-  maskDilationOffset,
   setDetectionResolution,
   setTextDetector,
   setRenderTextDirection,
   setTranslator,
   setTargetLanguage,
-  setInpaintingSize,
-  setCustomUnclipRatio,
-  setCustomBoxThreshold,
-  setMaskDilationOffset,
 }) => {
   return (
     <>
@@ -123,56 +105,6 @@ export const OptionsPanel: React.FC<Props> = ({
         />
       </div>
 
-      {/* 2段目のセクション */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mt-4">
-        {/* Inpainting Size */}
-        <LabeledSelect
-          id="inpaintingSize"
-          label="Inpainting Size"
-          icon="carbon:paint-brush"
-          title="Inpainting size"
-          value={inpaintingSize}
-          onChange={setInpaintingSize}
-          options={inpaintingSizes.map((size) => ({
-            label: `${size}px`,
-            value: String(size),
-          }))}
-        />
-
-        {/* Unclip Ratio */}
-        <LabeledInput
-          id="unclipRatio"
-          label="Unclip Ratio"
-          icon="weui:max-window-filled"
-          title="Unclip ratio"
-          step={0.01}
-          value={customUnclipRatio}
-          onChange={setCustomUnclipRatio}
-        />
-
-        {/* Box Threshold */}
-        <LabeledInput
-          id="boxThreshold"
-          label="Box Threshold"
-          icon="weui:photo-wall-outlined"
-          title="Box threshold"
-          step={0.01}
-          value={customBoxThreshold}
-          onChange={setCustomBoxThreshold}
-        />
-
-        {/* Mask Dilation Offset */}
-        <LabeledInput
-          id="maskDilationOffset"
-          label="Mask Dilation Offset"
-          icon="material-symbols:adjust-outline"
-          title="Mask dilation offset"
-          step={1}
-          value={maskDilationOffset}
-          onChange={setMaskDilationOffset}
-        />
-
-      </div>
     </>
   );
 };
