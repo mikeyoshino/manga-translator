@@ -165,7 +165,28 @@ function ProjectContent() {
       })
       .then((data) => {
         setProjectName(data.project.name);
-        setProjectImages(data.images);
+        const images: ProjectImage[] = data.images;
+        setProjectImages(images);
+
+        // Reset images orphaned in "translating" from a crashed session
+        const stuckImages = images.filter((pi) => pi.status === "translating");
+        if (stuckImages.length > 0) {
+          Promise.all(
+            stuckImages.map((pi) =>
+              apiFetch(`/api/projects/${projectId}/images/${pi.id}/status`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "uploaded" }),
+              }).catch(() => {})
+            )
+          ).then(() => {
+            setProjectImages((prev) =>
+              prev.map((pi) =>
+                pi.status === "translating" ? { ...pi, status: "uploaded" as const } : pi
+              )
+            );
+          });
+        }
       })
       .catch(() => navigate(lp("/studio")))
       .finally(() => setLoadingProject(false));
@@ -299,10 +320,33 @@ function ProjectContent() {
     const config = buildTranslationConfig();
     const controller = new AbortController();
     abortRef.current = controller;
+    const TRANSLATION_CONCURRENCY = 3;
     try {
-      for (const pi of untranslatedImages) {
-        if (controller.signal.aborted) break;
-        await translateProjectImage(pi, config, controller.signal);
+      const queue = [...untranslatedImages];
+      const inFlight = new Set<Promise<void>>();
+
+      const launchNext = () => {
+        if (queue.length === 0 || controller.signal.aborted) return;
+        const pi = queue.shift()!;
+        const p: Promise<void> = translateProjectImage(pi, config, controller.signal)
+          .catch((err) => {
+            if (err instanceof DOMException && err.name === "AbortError") {
+              controller.abort();
+            }
+            // Non-abort errors are already reflected in fileStatuses
+          })
+          .finally(() => {
+            inFlight.delete(p);
+            launchNext();
+          });
+        inFlight.add(p);
+      };
+
+      for (let i = 0; i < TRANSLATION_CONCURRENCY && queue.length > 0; i++) {
+        launchNext();
+      }
+      while (inFlight.size > 0) {
+        await Promise.race(inFlight);
       }
     } catch (err) {
       if (!(err instanceof DOMException && err.name === "AbortError")) {
@@ -326,10 +370,16 @@ function ProjectContent() {
     try {
       const formData = new FormData();
       formData.append("config", config);
+      // Per-image timeout: 10 minutes, combined with user's abort signal
+      const IMAGE_TIMEOUT_MS = 10 * 60 * 1000;
+      const signals = [AbortSignal.timeout(IMAGE_TIMEOUT_MS)];
+      if (signal) signals.push(signal);
+      const combinedSignal = AbortSignal.any(signals);
+
       const response = await apiFetch(`/api/projects/${projectId}/images/${pi.id}/translate`, {
         method: "POST",
         body: formData,
-        signal,
+        signal: combinedSignal,
       });
       if (response.status === 402) throw new Error("Insufficient tokens");
       if (response.status === 401) throw new Error("Not authenticated");
