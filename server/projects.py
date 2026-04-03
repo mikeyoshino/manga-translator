@@ -99,7 +99,7 @@ def list_projects(user_id: str) -> list[dict]:
     all_images = client.table("project_images") \
         .select("project_id, original_image_path, sequence") \
         .in_("project_id", project_ids) \
-        .order("sequence") \
+        .order("original_filename") \
         .execute()
 
     # Build per-project: count + first image path
@@ -145,7 +145,7 @@ def get_project(project_id: str, user_id: str) -> dict | None:
     if not proj.data:
         return None
     images = client.table("project_images").select("*") \
-        .eq("project_id", project_id).order("sequence").execute()
+        .eq("project_id", project_id).order("original_filename").execute()
 
     # Collect all paths that need signing
     paths_to_sign: list[str] = []

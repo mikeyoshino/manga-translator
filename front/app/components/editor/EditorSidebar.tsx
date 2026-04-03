@@ -50,7 +50,7 @@ function SidebarThumb({
   return (
     <button
       onClick={onClick}
-      className={`relative rounded-lg overflow-hidden border-2 transition-colors ${
+      className={`relative rounded-lg overflow-hidden border-2 transition-colors flex-shrink-0 w-16 h-16 ${
         isActive ? "border-indigo-500 shadow-sm" : "border-transparent hover:border-slate-300"
       }`}
     >
@@ -58,7 +58,7 @@ function SidebarThumb({
         <img
           src={thumbUrl}
           alt={`Image ${index + 1}`}
-          className="w-full h-auto object-cover"
+          className="w-full h-full object-cover"
         />
       )}
       {image.isDirty && (
