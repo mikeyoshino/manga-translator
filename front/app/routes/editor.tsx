@@ -92,7 +92,7 @@ function EditorContent() {
       <EditorToolbar onTogglePanel={() => setPanelOpen(v => !v)} panelOpen={panelOpen} />
       <div className="flex flex-1 min-h-0 relative">
         {/* Sidebar: hidden on phone */}
-        <div className="hidden sm:block">
+        <div className="hidden sm:block h-full min-h-0">
           <EditorSidebar />
         </div>
         <div className="flex-1 min-w-0 bg-slate-200">
